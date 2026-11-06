@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --af-bg: #000000;
+    --af-card: #1c1c1e;
+    --af-card-elevated: #2c2c2e;
+    --af-pill: #3a3a3c;
+    --af-label-secondary: #8e8e93;
+    --af-lime: #a4ff00;
+    --af-red: #fa114f;
+    --af-cyan: #00f5ea;
+    --af-yellow: #ffe620;
+    --af-purple: #bf5af2;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter', sans-serif;
+    background-color: #000000;
+    color: #ffffff;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .font-mono-num {
+    font-family: 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'JetBrains Mono', sans-serif;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Apple Fitness Surface Helpers */
+.af-card {
+  background-color: #1c1c1e;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.af-inset {
+  background-color: #2c2c2e;
+  border-radius: 14px;
+}
+
+/* Custom subtle scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(142, 142, 147, 0.35);
+  border-radius: 9999px;
+}
+
+/* Hide number input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
