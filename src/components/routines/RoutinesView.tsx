@@ -632,21 +632,29 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
                                 Target Sets
                               </label>
                               <input
-                                type="number"
-                                min={1}
-                                max={12}
-                                value={item.targetSets}
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="3"
+                                value={item.targetSets === 0 ? '' : String(item.targetSets)}
+                                onBlur={() => {
+                                  if (!item.targetSets || item.targetSets < 1) {
+                                    handleUpdateItem(item.id, (cur) => ({
+                                      ...cur,
+                                      targetSets: 3,
+                                    }));
+                                  }
+                                }}
                                 onChange={(e) => {
-                                  const val = Math.max(
-                                    1,
-                                    parseInt(e.target.value, 10) || 1
-                                  );
+                                  const cleaned = e.target.value
+                                    .replace(/[^0-9]/g, '')
+                                    .replace(/^0+(?=\d)/, '');
+                                  const raw = parseInt(cleaned, 10);
                                   handleUpdateItem(item.id, (cur) => ({
                                     ...cur,
-                                    targetSets: val,
+                                    targetSets: isNaN(raw) ? 0 : Math.max(0, raw),
                                   }));
                                 }}
-                                className="w-full bg-[#1c1c1e] rounded-lg px-2 py-1 text-center font-mono-num font-bold text-white"
+                                className="w-full bg-[#1c1c1e] rounded-lg px-2 py-1 text-center font-mono-num font-bold text-white placeholder-[#636366]"
                               />
                             </div>
 
@@ -656,45 +664,65 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
                               </label>
                               <div className="flex items-center gap-1">
                                 <input
-                                  type="number"
-                                  min={1}
-                                  max={50}
-                                  value={item.targetRepRange[0]}
+                                  type="text"
+                                  inputMode="numeric"
+                                  placeholder="8"
+                                  value={
+                                    item.targetRepRange[0] === 0
+                                      ? ''
+                                      : String(item.targetRepRange[0])
+                                  }
+                                  onBlur={() => {
+                                    if (!item.targetRepRange[0] || item.targetRepRange[0] < 1) {
+                                      handleUpdateItem(item.id, (cur) => ({
+                                        ...cur,
+                                        targetRepRange: [8, Math.max(8, cur.targetRepRange[1] || 12)],
+                                      }));
+                                    }
+                                  }}
                                   onChange={(e) => {
-                                    const minR = Math.max(
-                                      1,
-                                      parseInt(e.target.value, 10) || 1
-                                    );
+                                    const cleaned = e.target.value
+                                      .replace(/[^0-9]/g, '')
+                                      .replace(/^0+(?=\d)/, '');
+                                    const raw = parseInt(cleaned, 10);
+                                    const minR = isNaN(raw) ? 0 : Math.max(0, raw);
                                     handleUpdateItem(item.id, (cur) => ({
                                       ...cur,
-                                      targetRepRange: [
-                                        minR,
-                                        Math.max(minR, cur.targetRepRange[1]),
-                                      ],
+                                      targetRepRange: [minR, cur.targetRepRange[1]],
                                     }));
                                   }}
-                                  className="w-full bg-[#1c1c1e] rounded-lg px-1.5 py-1 text-center font-mono-num font-bold text-white"
+                                  className="w-full bg-[#1c1c1e] rounded-lg px-1.5 py-1 text-center font-mono-num font-bold text-white placeholder-[#636366]"
                                 />
                                 <span className="text-[#8e8e93]">–</span>
                                 <input
-                                  type="number"
-                                  min={1}
-                                  max={50}
-                                  value={item.targetRepRange[1]}
-                                  onChange={(e) => {
-                                    const maxR = Math.max(
-                                      1,
-                                      parseInt(e.target.value, 10) || 1
-                                    );
+                                  type="text"
+                                  inputMode="numeric"
+                                  placeholder="12"
+                                  value={
+                                    item.targetRepRange[1] === 0
+                                      ? ''
+                                      : String(item.targetRepRange[1])
+                                  }
+                                  onBlur={() => {
+                                    const minVal = Math.max(1, item.targetRepRange[0] || 8);
+                                    const maxVal = Math.max(minVal, item.targetRepRange[1] || 12);
                                     handleUpdateItem(item.id, (cur) => ({
                                       ...cur,
-                                      targetRepRange: [
-                                        Math.min(cur.targetRepRange[0], maxR),
-                                        maxR,
-                                      ],
+                                      targetRepRange: [minVal, maxVal],
                                     }));
                                   }}
-                                  className="w-full bg-[#1c1c1e] rounded-lg px-1.5 py-1 text-center font-mono-num font-bold text-white"
+                                  onChange={(e) => {
+                                    const cleaned = e.target.value
+                                      .replace(/[^0-9]/g, '')
+                                      .replace(/^0+(?=\d)/, '');
+                                    const raw = parseInt(cleaned, 10);
+                                    const maxR = isNaN(raw) ? 0 : Math.max(0, raw);
+                                    handleUpdateItem(item.id, (cur) => ({
+                                      ...cur,
+                                      targetRepRange: [cur.targetRepRange[0], maxR],
+                                    }));
+                                  }}
+                                  className="w-full bg-[#1c1c1e] rounded-lg px-1.5 py-1 text-center font-mono-num font-bold text-white placeholder-[#636366]"
                                 />
                               </div>
                             </div>
@@ -704,22 +732,29 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
                                 Rest (sec)
                               </label>
                               <input
-                                type="number"
-                                step={15}
-                                min={15}
-                                max={600}
-                                value={item.restSeconds}
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="90"
+                                value={item.restSeconds === 0 ? '' : String(item.restSeconds)}
+                                onBlur={() => {
+                                  if (!item.restSeconds || item.restSeconds < 15) {
+                                    handleUpdateItem(item.id, (cur) => ({
+                                      ...cur,
+                                      restSeconds: 90,
+                                    }));
+                                  }
+                                }}
                                 onChange={(e) => {
-                                  const rest = Math.max(
-                                    15,
-                                    parseInt(e.target.value, 10) || 60
-                                  );
+                                  const cleaned = e.target.value
+                                    .replace(/[^0-9]/g, '')
+                                    .replace(/^0+(?=\d)/, '');
+                                  const raw = parseInt(cleaned, 10);
                                   handleUpdateItem(item.id, (cur) => ({
                                     ...cur,
-                                    restSeconds: rest,
+                                    restSeconds: isNaN(raw) ? 0 : Math.max(0, raw),
                                   }));
                                 }}
-                                className="w-full bg-[#1c1c1e] rounded-lg px-2 py-1 text-center font-mono-num font-bold text-white"
+                                className="w-full bg-[#1c1c1e] rounded-lg px-2 py-1 text-center font-mono-num font-bold text-white placeholder-[#636366]"
                               />
                             </div>
                           </div>

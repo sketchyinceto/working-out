@@ -951,21 +951,6 @@ export function generateTrainerEvaluation(
     });
   }
 
-  const underTrained = muscleVolumeAudit
-    .filter((m) => m.status === 'under' && hasWorkouts)
-    .sort((a, b) => b.DeficitSets - a.DeficitSets);
-  if (underTrained.length > 0) {
-    const worst = underTrained[0];
-    coachingTips.push({
-      id: 'tip-volume-gap',
-      category: 'balance',
-      splitKey: worst.split,
-      title: `${worst.muscleLabel} Below Minimum Effective Volume`,
-      body: worst.coachAdvice,
-      metricBadge: `${worst.weeklySets}/${worst.targetMinSets} sets/wk`,
-    });
-  }
-
   const curWeek = tonnageTrends[tonnageTrends.length - 1];
   const priorWeeks = tonnageTrends.slice(0, -1).filter((w) => w.totalVolumeKg > 0);
   const chronicAvgKg =

@@ -66,6 +66,7 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
     setId: string;
     field: 'weight' | 'reps';
   } | null>(null);
+  const [editingRawValue, setEditingRawValue] = useState<string | null>(null);
   const [showAddExerciseModal, setShowAddExerciseModal] = useState(false);
   const [swapBlockId, setSwapBlockId] = useState<string | null>(null);
   const [exerciseSearch, setExerciseSearch] = useState('');
@@ -246,6 +247,7 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
 
   const applyQuickStep = (delta: number) => {
     if (!focusedCell) return;
+    setEditingRawValue(null);
     updateSet(focusedCell.blockId, focusedCell.setId, (cur) => {
       if (focusedCell.field === 'weight') {
         const curDisp = kgToDisplay(cur.weightKg, inputUnit);
@@ -664,47 +666,84 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
                       {/* Weight Input */}
                       <div className="col-span-3">
                         <input
-                          type="number"
-                          step="0.5"
-                          value={displayWeightVal}
-                          onFocus={() =>
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0"
+                          value={
+                            focusedCell?.blockId === block.id &&
+                            focusedCell?.setId === set.id &&
+                            focusedCell?.field === 'weight' &&
+                            editingRawValue !== null
+                              ? editingRawValue
+                              : displayWeightVal === 0
+                              ? ''
+                              : String(displayWeightVal)
+                          }
+                          onFocus={() => {
                             setFocusedCell({
                               blockId: block.id,
                               setId: set.id,
                               field: 'weight',
-                            })
-                          }
+                            });
+                            setEditingRawValue(
+                              displayWeightVal === 0 ? '' : String(displayWeightVal)
+                            );
+                          }}
+                          onBlur={() => setEditingRawValue(null)}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value);
+                            const cleaned = e.target.value
+                              .replace(/[^0-9.]/g, '')
+                              .replace(/^0+(?=\d)/, '');
+                            setEditingRawValue(cleaned);
+                            const val = parseFloat(cleaned);
                             updateSet(block.id, set.id, (cur) => ({
                               ...cur,
-                              weightKg: isNaN(val) ? 0 : displayToKg(val, inputUnit),
+                              weightKg: isNaN(val)
+                                ? 0
+                                : displayToKg(Math.max(0, val), inputUnit),
                             }));
                           }}
-                          className="w-full bg-[#2c2c2e] focus:ring-1 focus:ring-white/40 rounded-xl py-1.5 text-center text-sm font-bold font-mono-num text-white focus:outline-none"
+                          className="w-full bg-[#2c2c2e] focus:ring-1 focus:ring-white/40 rounded-xl py-1.5 text-center text-sm font-bold font-mono-num text-white placeholder-[#636366] focus:outline-none"
                         />
                       </div>
 
                       {/* Reps Input */}
                       <div className="col-span-2">
                         <input
-                          type="number"
-                          value={set.reps}
-                          onFocus={() =>
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="0"
+                          value={
+                            focusedCell?.blockId === block.id &&
+                            focusedCell?.setId === set.id &&
+                            focusedCell?.field === 'reps' &&
+                            editingRawValue !== null
+                              ? editingRawValue
+                              : set.reps === 0
+                              ? ''
+                              : String(set.reps)
+                          }
+                          onFocus={() => {
                             setFocusedCell({
                               blockId: block.id,
                               setId: set.id,
                               field: 'reps',
-                            })
-                          }
+                            });
+                            setEditingRawValue(set.reps === 0 ? '' : String(set.reps));
+                          }}
+                          onBlur={() => setEditingRawValue(null)}
                           onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
+                            const cleaned = e.target.value
+                              .replace(/[^0-9]/g, '')
+                              .replace(/^0+(?=\d)/, '');
+                            setEditingRawValue(cleaned);
+                            const val = parseInt(cleaned, 10);
                             updateSet(block.id, set.id, (cur) => ({
                               ...cur,
-                              reps: isNaN(val) ? 0 : val,
+                              reps: isNaN(val) ? 0 : Math.max(0, val),
                             }));
                           }}
-                          className="w-full bg-[#2c2c2e] focus:ring-1 focus:ring-white/40 rounded-xl py-1.5 text-center text-sm font-bold font-mono-num text-white focus:outline-none"
+                          className="w-full bg-[#2c2c2e] focus:ring-1 focus:ring-white/40 rounded-xl py-1.5 text-center text-sm font-bold font-mono-num text-white placeholder-[#636366] focus:outline-none"
                         />
                       </div>
 

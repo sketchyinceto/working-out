@@ -2,13 +2,12 @@ import React, { useEffect, useState } from 'react';
 import {
   BarChart3,
   BookOpen,
-  Download,
+  Cloud,
   Dumbbell,
   History,
   Play,
-  RotateCcw,
   Sparkles,
-  Trash2,
+  User,
 } from 'lucide-react';
 import {
   ActiveWorkoutDraft,
@@ -48,8 +47,46 @@ type NavTab =
   | 'exercises';
 
 const LOCAL_STORAGE_KEY = 'apex_lift_tracker_v2';
+const CURRENT_USER_KEY = 'yk_lifts_current_user';
+const CLOUD_URL_KEY = 'yk_lifts_cloud_db_url';
 
-function buildInitialState(withDemo = true): AppDatabaseState {
+// Paste your Google Cloud / Firebase Realtime Database URL here (e.g. "https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app")
+const DEFAULT_CLOUD_DB_URL = '';
+
+function normalizeUserKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '_');
+}
+
+function getUserStorageKey(userName: string): string {
+  const key = normalizeUserKey(userName);
+  return key ? `${LOCAL_STORAGE_KEY}_${key}` : LOCAL_STORAGE_KEY;
+}
+
+function loadLocalUserState(userName: string): AppDatabaseState {
+  try {
+    const userStorageKey = getUserStorageKey(userName);
+    const cached =
+      localStorage.getItem(userStorageKey) ||
+      localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached) as AppDatabaseState;
+      return {
+        ...parsed,
+        unit: 'kg',
+        exercises: ensureSeedExercises(parsed.exercises || SEED_EXERCISES),
+        routines: ensureStarterRoutines(parsed.routines || []),
+      };
+    }
+  } catch {
+    // Fallback
+  }
+  return buildInitialState(false);
+}
+
+function buildInitialState(withDemo = false): AppDatabaseState {
   return {
     unit: 'kg',
     exercises: SEED_EXERCISES,
@@ -74,23 +111,37 @@ function ensureSeedExercises(existing: Exercise[]): Exercise[] {
 }
 
 export const App: React.FC = () => {
-  const [state, setState] = useState<AppDatabaseState>(() => {
+  const [userName, setUserName] = useState<string>(() => {
     try {
-      const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (cached) {
-        const parsed = JSON.parse(cached) as AppDatabaseState;
-        return {
-          ...parsed,
-          unit: 'kg',
-          exercises: ensureSeedExercises(parsed.exercises || SEED_EXERCISES),
-          routines: ensureStarterRoutines(parsed.routines || []),
-        };
-      }
+      return localStorage.getItem(CURRENT_USER_KEY) || '';
     } catch {
-      // Fallback
+      return '';
     }
-    return buildInitialState(true);
   });
+  const [cloudDbUrl, setCloudDbUrl] = useState<string>(() => {
+    try {
+      return (
+        localStorage.getItem(CLOUD_URL_KEY) ||
+        DEFAULT_CLOUD_DB_URL
+      ).replace(/\/+$/, '');
+    } catch {
+      return DEFAULT_CLOUD_DB_URL.replace(/\/+$/, '');
+    }
+  });
+  const [showProfileModal, setShowProfileModal] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem(CURRENT_USER_KEY);
+    } catch {
+      return true;
+    }
+  });
+  const [nameInput, setNameInput] = useState<string>(userName);
+  const [cloudUrlInput, setCloudUrlInput] = useState<string>(cloudDbUrl);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+
+  const [state, setState] = useState<AppDatabaseState>(() =>
+    loadLocalUserState(userName)
+  );
 
   const [activeTab, setActiveTab] = useState<NavTab>('analytics');
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
@@ -103,47 +154,102 @@ export const App: React.FC = () => {
   const isHydratingRef = React.useRef(true);
   const lastSavedJsonRef = React.useRef<string>('');
 
+  // Hydrate data whenever userName or cloudDbUrl changes
   useEffect(() => {
-    fetch('/api/store')
+    const userKey = normalizeUserKey(userName);
+    isHydratingRef.current = true;
+    const localState = loadLocalUserState(userName);
+    setState(localState);
+
+    if (!userKey) {
+      isHydratingRef.current = false;
+      return;
+    }
+
+    const endpoint = cloudDbUrl
+      ? `${cloudDbUrl}/users/${userKey}.json`
+      : `/api/store?user=${encodeURIComponent(userKey)}`;
+
+    if (cloudDbUrl) setSyncStatus('syncing');
+
+    fetch(endpoint)
       .then((res) => {
         if (res.ok) return res.json();
         return null;
       })
       .then((serverData) => {
-        if (serverData && Array.isArray(serverData.workouts)) {
+        if (serverData && typeof serverData === 'object' && !serverData.empty) {
           const hydrated: AppDatabaseState = {
+            ...localState,
             ...serverData,
             unit: 'kg',
+            workouts: Array.isArray(serverData.workouts)
+              ? serverData.workouts
+              : localState.workouts,
+            measurements: Array.isArray(serverData.measurements)
+              ? serverData.measurements
+              : localState.measurements,
             exercises: ensureSeedExercises(serverData.exercises || SEED_EXERCISES),
             routines: ensureStarterRoutines(serverData.routines || []),
           };
           lastSavedJsonRef.current = JSON.stringify(hydrated);
           setState(hydrated);
+          if (cloudDbUrl) setSyncStatus('synced');
+        } else if (cloudDbUrl) {
+          // User doesn't exist in cloud yet — push existing local data up to cloud
+          const initialPayload = JSON.stringify(localState);
+          lastSavedJsonRef.current = initialPayload;
+          fetch(endpoint, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: initialPayload,
+          })
+            .then((r) => setSyncStatus(r.ok ? 'synced' : 'error'))
+            .catch(() => setSyncStatus('error'));
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (cloudDbUrl) setSyncStatus('error');
+      })
       .finally(() => {
         isHydratingRef.current = false;
       });
-  }, []);
+  }, [userName, cloudDbUrl]);
 
+  // Save data locally and to Google Cloud / Firebase whenever state changes
   useEffect(() => {
     try {
       const serialized = JSON.stringify(state);
+      const storageKey = getUserStorageKey(userName);
+      localStorage.setItem(storageKey, serialized);
       localStorage.setItem(LOCAL_STORAGE_KEY, serialized);
+
       if (isHydratingRef.current || serialized === lastSavedJsonRef.current) {
         return;
       }
       lastSavedJsonRef.current = serialized;
-      fetch('/api/store', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: serialized,
-      }).catch(() => {});
+
+      const userKey = normalizeUserKey(userName);
+      if (cloudDbUrl && userKey) {
+        setSyncStatus('syncing');
+        fetch(`${cloudDbUrl}/users/${userKey}.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: serialized,
+        })
+          .then((r) => setSyncStatus(r.ok ? 'synced' : 'error'))
+          .catch(() => setSyncStatus('error'));
+      } else {
+        fetch(`/api/store?user=${encodeURIComponent(userKey || 'default')}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: serialized,
+        }).catch(() => {});
+      }
     } catch {
       // Ignore quota errors
     }
-  }, [state]);
+  }, [state, userName, cloudDbUrl]);
 
   const handleStartRoutine = (routine: Routine) => {
     const exMap = new Map(state.exercises.map((e) => [e.id, e]));
@@ -461,14 +567,6 @@ export const App: React.FC = () => {
     }));
   };
 
-  const handleClearDemoData = () => {
-    setState(buildInitialState(false));
-  };
-
-  const handleRestoreDemoData = () => {
-    setState(buildInitialState(true));
-  };
-
   const handleExportJson = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], {
       type: 'application/json',
@@ -483,6 +581,26 @@ export const App: React.FC = () => {
 
   const handleOpenExerciseDetail = (exId: string) => {
     setSelectedExerciseId(exId);
+  };
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = nameInput.trim();
+    if (!trimmedName) return;
+    const trimmedUrl = cloudUrlInput.trim().replace(/\/+$/, '');
+    try {
+      localStorage.setItem(CURRENT_USER_KEY, trimmedName);
+      if (trimmedUrl) {
+        localStorage.setItem(CLOUD_URL_KEY, trimmedUrl);
+      } else {
+        localStorage.removeItem(CLOUD_URL_KEY);
+      }
+    } catch {
+      // Ignore
+    }
+    setUserName(trimmedName);
+    setCloudDbUrl(trimmedUrl || DEFAULT_CLOUD_DB_URL.replace(/\/+$/, ''));
+    setShowProfileModal(false);
   };
 
   const selectedExercise = state.exercises.find((e) => e.id === selectedExerciseId) || null;
@@ -501,38 +619,118 @@ export const App: React.FC = () => {
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            {state.isDemoData && state.workouts.length > 0 ? (
-              <button
-                type="button"
-                onClick={handleClearDemoData}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#1c1c1e] hover:bg-[#2c2c2e] text-[#8e8e93] hover:text-white text-[11px] font-semibold transition"
-                title="Clear sample history"
-              >
-                <Trash2 className="w-3 h-3" /> Clear Demo
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleRestoreDemoData}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#1c1c1e] hover:bg-[#2c2c2e] text-[#a4ff00] hover:text-white text-[11px] font-semibold transition"
-                title="Restore 10-week sample workout history"
-              >
-                <RotateCcw className="w-3 h-3" /> Load Demo
-              </button>
+          <button
+            type="button"
+            onClick={() => {
+              setNameInput(userName);
+              setCloudUrlInput(cloudDbUrl);
+              setShowProfileModal(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1c1c1e] hover:bg-[#2c2c2e] border border-white/[0.08] text-xs font-semibold text-white transition"
+            title="Switch User Profile & Cloud Sync"
+          >
+            <User className="w-3.5 h-3.5 text-[#a4ff00]" />
+            <span className="max-w-[110px] truncate">
+              {userName || 'Set Name'}
+            </span>
+            {cloudDbUrl && (
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  syncStatus === 'synced'
+                    ? 'bg-[#a4ff00]'
+                    : syncStatus === 'syncing'
+                    ? 'bg-[#ffe620] animate-pulse'
+                    : syncStatus === 'error'
+                    ? 'bg-[#fa114f]'
+                    : 'bg-[#8e8e93]'
+                }`}
+                title={
+                  syncStatus === 'synced'
+                    ? 'Cloud Synced'
+                    : syncStatus === 'syncing'
+                    ? 'Syncing...'
+                    : 'Cloud Sync Error'
+                }
+              />
             )}
-
-            <button
-              type="button"
-              onClick={handleExportJson}
-              className="p-1.5 rounded-full bg-[#1c1c1e] hover:bg-[#2c2c2e] text-[#8e8e93] hover:text-white transition"
-              title="Backup JSON"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-          </div>
+          </button>
         </div>
       </header>
+
+      {/* First-Time Name Prompt & Cross-Platform Profile Modal */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xl flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSaveProfile}
+            className="w-full max-w-sm bg-[#1c1c1e] border border-white/10 rounded-[26px] p-5 space-y-4 shadow-2xl"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#a4ff00]/15 text-[#a4ff00] flex items-center justify-center shrink-0">
+                <User className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white">
+                  {userName ? 'Athlete Profile & Sync' : 'Welcome to YK LIFTS'}
+                </h2>
+                <p className="text-xs text-[#8e8e93]">
+                  Enter your name to save & load your workouts across devices.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#8e8e93] mb-1">
+                  Your Name
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  required
+                  placeholder="e.g. Keven"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white placeholder-[#636366] focus:outline-none focus:border-[#a4ff00]"
+                />
+              </div>
+
+              {!DEFAULT_CLOUD_DB_URL && (
+                <div>
+                  <label className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#8e8e93] mb-1">
+                    <Cloud className="w-3 h-3 text-[#00f5ea]" /> Google Cloud / Firebase DB URL (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://your-project-default-rtdb.firebasedatabase.app"
+                    value={cloudUrlInput}
+                    onChange={(e) => setCloudUrlInput(e.target.value)}
+                    className="w-full bg-[#2c2c2e] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-[#636366] focus:outline-none focus:border-[#00f5ea]"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              {userName && (
+                <button
+                  type="button"
+                  onClick={() => setShowProfileModal(false)}
+                  className="flex-1 py-2.5 rounded-full bg-[#2c2c2e] text-white font-semibold text-xs"
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={!nameInput.trim()}
+                className="flex-1 py-2.5 rounded-full bg-[#a4ff00] disabled:opacity-40 text-black font-extrabold text-xs"
+              >
+                {userName ? 'Save Profile' : 'Continue'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Active Workout Resume Banner */}
       {state.activeWorkout && activeTab !== 'logger' && (
@@ -698,6 +896,7 @@ export const App: React.FC = () => {
               }))
             }
             onStartWorkout={() => setActiveTab('routines')}
+            onExportJson={handleExportJson}
           />
         )}
 

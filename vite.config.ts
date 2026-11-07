@@ -6,12 +6,46 @@ import path from 'node:path';
 
 function workoutStorePlugin(): Plugin {
   const dataDir = path.resolve(process.cwd(), 'data');
-  const storePath = path.join(dataDir, 'workout-store.json');
+  const getStorePath = (reqUrl?: string) => {
+    try {
+      const u = new URL(reqUrl || '', 'http://localhost');
+      const user = (u.searchParams.get('user') || 'default')
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '_');
+      if (user && user !== 'default') {
+        const userFile = path.join(dataDir, `workout-store-${user}.json`);
+        if (fs.existsSync(userFile)) return userFile;
+        // Fallback to default workout-store.json on first read if it exists
+        const fallback = path.join(dataDir, 'workout-store.json');
+        if (fs.existsSync(fallback)) return fallback;
+        return userFile;
+      }
+    } catch {
+      // Ignore
+    }
+    return path.join(dataDir, 'workout-store.json');
+  };
+
+  const getWritePath = (reqUrl?: string) => {
+    try {
+      const u = new URL(reqUrl || '', 'http://localhost');
+      const user = (u.searchParams.get('user') || 'default')
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '_');
+      if (user && user !== 'default') {
+        return path.join(dataDir, `workout-store-${user}.json`);
+      }
+    } catch {
+      // Ignore
+    }
+    return path.join(dataDir, 'workout-store.json');
+  };
 
   const attachMiddleware = (middlewares: any) => {
     middlewares.use('/api/store', (req: any, res: any, next: any) => {
       if (req.method === 'GET') {
         try {
+          const storePath = getStorePath(req.url);
           if (fs.existsSync(storePath)) {
             const raw = fs.readFileSync(storePath, 'utf-8');
             res.setHeader('Content-Type', 'application/json');
@@ -29,7 +63,7 @@ function workoutStorePlugin(): Plugin {
         }
       }
 
-      if (req.method === 'POST') {
+      if (req.method === 'POST' || req.method === 'PUT') {
         let body = '';
         req.on('data', (chunk: any) => {
           body += chunk;
@@ -39,11 +73,12 @@ function workoutStorePlugin(): Plugin {
             if (!fs.existsSync(dataDir)) {
               fs.mkdirSync(dataDir, { recursive: true });
             }
-            const existing = fs.existsSync(storePath)
-              ? fs.readFileSync(storePath, 'utf-8')
+            const writePath = getWritePath(req.url);
+            const existing = fs.existsSync(writePath)
+              ? fs.readFileSync(writePath, 'utf-8')
               : null;
             if (existing !== body) {
-              fs.writeFileSync(storePath, body, 'utf-8');
+              fs.writeFileSync(writePath, body, 'utf-8');
             }
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ ok: true }));
@@ -63,7 +98,6 @@ function workoutStorePlugin(): Plugin {
     name: 'workout-store-api',
     configureServer(server) {
       server.watcher.unwatch(path.join(dataDir, '**'));
-      server.watcher.unwatch(storePath);
       attachMiddleware(server.middlewares);
     },
     configurePreviewServer(server) {

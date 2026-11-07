@@ -4,7 +4,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Layers,
   Plus,
   Scale,
   Search,
@@ -27,7 +26,6 @@ import {
 } from '../../data/seedExercises';
 import {
   computeWeeklyMuscleVolumes,
-  computeWeeklyTonnageTrends,
   formatShortDate,
   getExerciseProgressionSeries,
 } from '../../utils/analytics';
@@ -71,8 +69,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [exerciseSearchQuery, setExerciseSearchQuery] = useState('');
   const [pickerSplitFilter, setPickerSplitFilter] = useState<
-    'All' | 'Push' | 'Pull' | 'Legs'
-  >('All');
+    'Logged' | 'All' | 'Push' | 'Pull' | 'Legs'
+  >('Logged');
   const [daysFilter, setDaysFilter] = useState<number | null>(90);
   const [heatmapWindowDays, setHeatmapWindowDays] = useState<7 | 28>(7);
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | null>(null);
@@ -104,14 +102,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     [spotlightExercise, workouts, exercises, unit]
   );
 
-  const filteredPickerExercises = useMemo(() => {
-    const byText = searchExercises(exercises, exerciseSearchQuery);
-    return byText.filter((ex) => {
-      if (pickerSplitFilter === 'All') return true;
-      return MUSCLE_CATEGORY_MAP[ex.primaryMuscle] === pickerSplitFilter;
-    });
-  }, [exercises, exerciseSearchQuery, pickerSplitFilter]);
-
   const exerciseSessionCounts = useMemo(() => {
     const counts = new Map<string, { sessions: number; best1RMKg: number }>();
     for (const ex of exercises) {
@@ -124,10 +114,16 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     return counts;
   }, [exercises, workouts]);
 
-  const weeklyTonnage = useMemo(
-    () => computeWeeklyTonnageTrends(workouts, exercises, 8),
-    [workouts, exercises]
-  );
+  const filteredPickerExercises = useMemo(() => {
+    const byText = searchExercises(exercises, exerciseSearchQuery);
+    return byText.filter((ex) => {
+      if (pickerSplitFilter === 'Logged') {
+        return exerciseSessionCounts.has(ex.id);
+      }
+      if (pickerSplitFilter === 'All') return true;
+      return MUSCLE_CATEGORY_MAP[ex.primaryMuscle] === pickerSplitFilter;
+    });
+  }, [exercises, exerciseSearchQuery, pickerSplitFilter, exerciseSessionCounts]);
 
   const muscleVolumes = useMemo(
     () => computeWeeklyMuscleVolumes(workouts, exercises, heatmapWindowDays),
@@ -220,11 +216,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   const firstTrend = bwCoords[0]?.trendVal ?? 0;
   const trendDelta = Number((latestTrend - firstTrend).toFixed(1));
 
-  const maxWeeklyVolume = Math.max(
-    ...weeklyTonnage.map((w) => w.totalVolumeKg),
-    1000
-  );
-
   return (
     <div className="space-y-4 pb-6">
       {/* Page Title */}
@@ -244,37 +235,25 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           <button
             type="button"
             onClick={() => setShowExercisePicker((v) => !v)}
-            className="flex items-center gap-2.5 min-w-0 bg-[#2c2c2e]/85 hover:bg-[#3a3a3c] border border-white/[0.08] rounded-2xl px-3 py-2 transition text-left group"
+            className="flex items-center gap-2 min-w-0 bg-[#2c2c2e]/85 hover:bg-[#3a3a3c] border border-white/[0.08] rounded-xl px-3 py-1.5 transition text-left group"
           >
             <div
-              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+              className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
               style={{ backgroundColor: `${spotlightPalette.hex}22` }}
             >
               <TrendingUp
-                className="w-4 h-4"
+                className="w-3.5 h-3.5"
                 style={{ color: spotlightPalette.hex }}
               />
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span
-                  className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${spotlightPalette.badgeClass}`}
-                >
-                  {MUSCLE_LABELS[spotlightExercise.primaryMuscle]}
-                </span>
-                <span className="text-[10px] text-[#8e8e93] capitalize hidden sm:inline">
-                  {spotlightExercise.equipment.replace('_', ' ')}
-                </span>
-              </div>
-              <div className="text-sm sm:text-base font-bold text-white truncate flex items-center gap-1.5 mt-0.5">
-                <span className="truncate">{spotlightExercise.name}</span>
-                <ChevronDown
-                  className={`w-4 h-4 text-[#8e8e93] group-hover:text-white shrink-0 transition-transform ${
-                    showExercisePicker ? 'rotate-180 text-white' : ''
-                  }`}
-                />
-              </div>
-            </div>
+            <span className="text-sm sm:text-base font-bold text-white truncate">
+              {spotlightExercise.name}
+            </span>
+            <ChevronDown
+              className={`w-4 h-4 text-[#8e8e93] group-hover:text-white shrink-0 transition-transform ${
+                showExercisePicker ? 'rotate-180 text-white' : ''
+              }`}
+            />
           </button>
 
           <div className="flex items-center bg-[#2c2c2e] p-0.5 rounded-[10px] text-[11px] shrink-0">
@@ -325,11 +304,13 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center bg-[#1c1c1e] p-0.5 rounded-xl text-[11px] gap-0.5 shrink-0">
-                {(['All', 'Push', 'Pull', 'Legs'] as const).map((cat) => {
+              <div className="flex items-center bg-[#1c1c1e] p-0.5 rounded-xl text-[11px] gap-0.5 shrink-0 overflow-x-auto">
+                {(['Logged', 'All', 'Push', 'Pull', 'Legs'] as const).map((cat) => {
                   const isActive = pickerSplitFilter === cat;
                   const activeCls =
-                    cat === 'All'
+                    cat === 'Logged'
+                      ? 'bg-[#a4ff00] text-black font-bold'
+                      : cat === 'All'
                       ? 'bg-[#3a3a3c] text-white font-bold'
                       : getSplitPalette(cat).solidPillClass;
                   return (
@@ -337,7 +318,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                       key={cat}
                       type="button"
                       onClick={() => setPickerSplitFilter(cat)}
-                      className={`px-2.5 py-1 rounded-lg font-semibold transition ${
+                      className={`px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition ${
                         isActive ? activeCls : 'text-[#8e8e93] hover:text-white'
                       }`}
                     >
@@ -350,8 +331,21 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
             <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
               {filteredPickerExercises.length === 0 ? (
-                <div className="text-xs text-[#8e8e93] text-center py-4">
-                  No exercises match &ldquo;{exerciseSearchQuery}&rdquo;
+                <div className="text-xs text-[#8e8e93] text-center py-4 space-y-1.5">
+                  <div>
+                    {pickerSplitFilter === 'Logged' && !exerciseSearchQuery
+                      ? 'No logged exercises yet'
+                      : `No exercises match "${exerciseSearchQuery}"`}
+                  </div>
+                  {pickerSplitFilter === 'Logged' && (
+                    <button
+                      type="button"
+                      onClick={() => setPickerSplitFilter('All')}
+                      className="text-[11px] font-bold text-[#a4ff00] hover:underline"
+                    >
+                      Show All Exercises
+                    </button>
+                  )}
                 </div>
               ) : (
                 filteredPickerExercises.map((ex) => {
@@ -375,12 +369,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 ${exPal.badgeClass}`}
-                        >
-                          {MUSCLE_LABELS[ex.primaryMuscle]
-                            .replace(' & Traps', '')
-                            .replace(' & Core', '')}
-                        </span>
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: exPal.hex }}
+                        />
                         <span className="text-xs font-bold text-white truncate">
                           {ex.name}
                         </span>
@@ -518,78 +509,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           >
             Show More <ChevronRight className="w-3.5 h-3.5" />
           </button>
-        </div>
-      </div>
-
-      {/* Weekly Volume & PPL Split Chart (Push = Red, Pull = Teal, Legs = Purple) */}
-      <div className="af-card p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-2 mb-4">
-          <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-[#2c2c2e] flex items-center justify-center">
-              <Layers className="w-4 h-4 text-white" />
-            </div>
-            Weekly Volume & Split
-          </h2>
-          <div className="flex items-center gap-2.5 text-[11px] text-[#8e8e93]">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-[#fa114f]" /> Push
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-[#00f5ea]" /> Pull
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-[#bf5af2]" /> Legs
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-8 gap-2 items-end h-36 pt-4 px-1">
-          {weeklyTonnage.map((wk, idx) => {
-            const totalHeightPct = Math.max(
-              10,
-              Math.round((wk.totalVolumeKg / maxWeeklyVolume) * 100)
-            );
-            const totalSets = Math.max(1, wk.pushSets + wk.pullSets + wk.legsSets);
-            const pushPct = (wk.pushSets / totalSets) * 100;
-            const pullPct = (wk.pullSets / totalSets) * 100;
-            const legsPct = (wk.legsSets / totalSets) * 100;
-
-            return (
-              <div
-                key={wk.weekStartISO}
-                className="flex flex-col items-center h-full justify-end group relative"
-              >
-                <div className="text-[9px] font-mono-num text-[#8e8e93] mb-1">
-                  {wk.totalWorkingSets > 0 ? `${wk.totalWorkingSets}s` : ''}
-                </div>
-
-                <div
-                  className="w-full max-w-[26px] rounded-t-full overflow-hidden flex flex-col bg-[#2c2c2e]"
-                  style={{ height: `${totalHeightPct}%` }}
-                >
-                  {wk.totalWorkingSets > 0 ? (
-                    <>
-                      <div style={{ height: `${legsPct}%` }} className="bg-[#bf5af2] w-full" />
-                      <div style={{ height: `${pullPct}%` }} className="bg-[#00f5ea] w-full" />
-                      <div style={{ height: `${pushPct}%` }} className="bg-[#fa114f] w-full" />
-                    </>
-                  ) : (
-                    <div className="h-full w-full bg-[#2c2c2e]" />
-                  )}
-                </div>
-
-                <span
-                  className={`text-[10px] mt-1.5 truncate max-w-full ${
-                    idx === weeklyTonnage.length - 1
-                      ? 'text-white font-bold'
-                      : 'text-[#8e8e93]'
-                  }`}
-                >
-                  {idx === weeklyTonnage.length - 1 ? 'Now' : wk.weekLabel}
-                </span>
-              </div>
-            );
-          })}
         </div>
       </div>
 

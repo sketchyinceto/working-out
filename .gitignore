@@ -13,6 +13,8 @@ node_modules
 # Production build output
 dist
 dist-ssr
+*.zip
+.netlify
 
 # Local environment & stores
 *.local

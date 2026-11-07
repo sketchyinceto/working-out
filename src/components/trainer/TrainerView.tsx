@@ -55,7 +55,6 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
   onSwapExerciseInRoutine,
   onOpenExerciseDetail,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'lifts' | 'muscles'>('lifts');
   const [splitFilter, setSplitFilter] = useState<'All' | 'Push' | 'Pull' | 'Legs'>(
     'All'
   );
@@ -70,8 +69,6 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
     [workouts, exercises, routines, unit]
   );
 
-  const [showAllMuscles, setShowAllMuscles] = useState(false);
-
   const filteredDiagnostics = useMemo(() => {
     return report.exerciseDiagnostics.filter(
       (d) =>
@@ -85,14 +82,6 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
           MUSCLE_CATEGORY_MAP[d.exercise.primaryMuscle] === splitFilter)
     );
   }, [report.exerciseDiagnostics, splitFilter]);
-
-  const filteredMuscles = useMemo(() => {
-    return report.muscleVolumeAudit.filter(
-      (m) =>
-        (splitFilter === 'All' || m.split === splitFilter) &&
-        (showAllMuscles || m.status !== 'optimal')
-    );
-  }, [report.muscleVolumeAudit, splitFilter, showAllMuscles]);
 
   const getStatusBadge = (status: ProgressionStatus) => {
     switch (status) {
@@ -545,33 +534,11 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
         )}
       </div>
 
-      {/* 2. Statistical Diagnostics & Volume Audit */}
+      {/* 2. Statistical Lift Trends & Split Filter */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
-        <div className="grid grid-cols-2 bg-[#1c1c1e] p-1 rounded-[12px] text-xs">
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('lifts')}
-            className={`py-1.5 px-3 rounded-[9px] font-semibold inline-flex items-center justify-center gap-1.5 transition ${
-              activeSubTab === 'lifts'
-                ? 'bg-[#3a3a3c] text-white font-bold'
-                : 'text-[#8e8e93] hover:text-white'
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5 text-[#a4ff00]" /> Lift Trends (
-            {filteredDiagnostics.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('muscles')}
-            className={`py-1.5 px-3 rounded-[9px] font-semibold inline-flex items-center justify-center gap-1.5 transition ${
-              activeSubTab === 'muscles'
-                ? 'bg-[#3a3a3c] text-white font-bold'
-                : 'text-[#8e8e93] hover:text-white'
-            }`}
-          >
-            <Flame className="w-3.5 h-3.5 text-[#fa114f]" /> Volume Gaps (
-            {filteredMuscles.length})
-          </button>
+        <div className="inline-flex items-center gap-1.5 px-1 text-sm font-bold text-white">
+          <TrendingUp className="w-4 h-4 text-[#a4ff00]" />
+          <span>Lift Trends ({filteredDiagnostics.length})</span>
         </div>
 
         <div className="grid grid-cols-4 bg-[#1c1c1e] p-1 rounded-[12px] text-xs gap-1">
@@ -597,9 +564,8 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
         </div>
       </div>
 
-      {/* Sub-Tab 1: Statistical Lift Insights (Only meaningful trends) */}
-      {activeSubTab === 'lifts' ? (
-        filteredDiagnostics.length === 0 ? (
+      {/* Statistical Lift Insights (Only meaningful trends) */}
+      {filteredDiagnostics.length === 0 ? (
           <div className="af-card border border-white/[0.06] p-6 text-center space-y-2">
             <div className="text-sm font-bold text-white">
               No Statistical Anomalies Detected
@@ -758,184 +724,6 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
               </div>
             );
           })}
-        </div>
-        )
-      ) : (
-        /* Sub-Tab 2: Muscle Volume Audit & Weak-Point Exercise Suggestions */
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-1 text-xs">
-            <span className="text-[11px] text-[#8e8e93]">
-              {showAllMuscles
-                ? 'Showing all 12 muscle groups'
-                : 'Showing significant volume gaps only'}
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowAllMuscles(!showAllMuscles)}
-              className="text-[11px] font-semibold text-[#a4ff00] hover:underline"
-            >
-              {showAllMuscles ? 'Filter to Gaps Only' : 'Show All Muscle Groups'}
-            </button>
-          </div>
-
-          {filteredMuscles.length === 0 ? (
-            <div className="af-card border border-white/[0.06] p-6 text-center space-y-2">
-              <div className="text-sm font-bold text-white">
-                All Target Muscles in Hypertrophy Zone
-              </div>
-              <p className="text-xs text-[#8e8e93] max-w-md mx-auto leading-relaxed">
-                No under-trained muscle groups or excessive junk volume detected. All muscle groups are within optimal weekly volume landmarks.
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowAllMuscles(true)}
-                className="mt-1 text-xs font-bold text-[#a4ff00] hover:underline inline-block"
-              >
-                Inspect All Muscle Volumes
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {filteredMuscles.map((item) => {
-                const mPalette = getSplitPalette(item.split);
-            const pct = Math.min(
-              100,
-              Math.round((item.weeklySets / item.targetMaxSets) * 100)
-            );
-            const minMarkerPct = Math.round(
-              (item.targetMinSets / item.targetMaxSets) * 100
-            );
-
-            return (
-              <div
-                key={item.muscle}
-                style={mPalette.cardGlowStyle}
-                className={`af-card border ${mPalette.cardBorderClass} p-4 space-y-3`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${mPalette.badgeClass}`}
-                    >
-                      {item.split}
-                    </span>
-                    <h3 className="text-sm font-bold text-white">
-                      {item.muscleLabel}
-                    </h3>
-                  </div>
-
-                  <span
-                    className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                      item.status === 'optimal'
-                        ? 'bg-[#a4ff00]/15 text-[#a4ff00]'
-                        : item.status === 'under'
-                        ? 'bg-[#ffe620]/20 text-[#ffe620]'
-                        : 'bg-[#fa114f]/20 text-[#ff375f]'
-                    }`}
-                  >
-                    {item.status === 'optimal'
-                      ? 'Optimal Zone'
-                      : item.status === 'under'
-                      ? `Needs +${item.DeficitSets} Sets`
-                      : 'High Volume'}
-                  </span>
-                </div>
-
-                {/* Volume Progress Bar with MEV Landmark */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-mono-num">
-                    <span className="text-white font-bold">
-                      {item.weeklySets} sets / wk
-                    </span>
-                    <span className="text-[#8e8e93]">
-                      Target: {item.targetMinSets}–{item.targetMaxSets} sets
-                    </span>
-                  </div>
-                  <div className="relative w-full h-2 bg-[#2c2c2e] rounded-full overflow-hidden">
-                    <div
-                      style={{
-                        width: `${pct}%`,
-                        backgroundColor: mPalette.hex,
-                      }}
-                      className="h-full rounded-full transition-all"
-                    />
-                    <div
-                      style={{ left: `${minMarkerPct}%` }}
-                      className="absolute inset-y-0 w-0.5 bg-white/60"
-                      title={`Minimum Effective Volume: ${item.targetMinSets} sets`}
-                    />
-                  </div>
-                </div>
-
-                <p className="text-xs text-[#d1d1d6] leading-relaxed">
-                  {item.coachAdvice}
-                </p>
-
-                {/* Recommended Exercises to Add */}
-                {item.recommendedExercises.length > 0 && (
-                  <div className="pt-2 border-t border-white/[0.06] space-y-1.5">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-[#8e8e93]">
-                      Coach Recommended Exercises
-                    </div>
-                    <div className="space-y-1.5">
-                      {item.recommendedExercises.map((recEx) => {
-                        const addKey = `add-${item.targetRoutineId}-${recEx.id}`;
-                        const isAdded = !!appliedActionIds[addKey];
-                        return (
-                          <div
-                            key={recEx.id}
-                            className="flex items-center justify-between gap-2 bg-black/45 rounded-xl px-3 py-1.5"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => onOpenExerciseDetail(recEx.id)}
-                              className="text-xs font-semibold text-white hover:underline truncate text-left"
-                            >
-                              {recEx.name}
-                            </button>
-
-                            {item.targetRoutineId && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onAddExerciseToRoutine(
-                                    item.targetRoutineId!,
-                                    recEx
-                                  );
-                                  setAppliedActionIds((prev) => ({
-                                    ...prev,
-                                    [addKey]: true,
-                                  }));
-                                }}
-                                className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 shrink-0 transition ${
-                                  isAdded
-                                    ? 'bg-[#a4ff00]/20 text-[#a4ff00]'
-                                    : 'bg-[#2c2c2e] hover:bg-[#3a3a3c] text-white'
-                                }`}
-                              >
-                                {isAdded ? (
-                                  <>
-                                    <Check className="w-3 h-3" /> Added
-                                  </>
-                                ) : (
-                                  <>
-                                    <Plus className="w-3 h-3" /> Add to{' '}
-                                    {item.split}
-                                  </>
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-            </div>
-          )}
         </div>
       )}
     </div>

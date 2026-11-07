@@ -3,6 +3,7 @@ import {
   Award,
   ChevronDown,
   ChevronUp,
+  Download,
   Dumbbell,
   Minus,
   Moon,
@@ -42,6 +43,7 @@ interface HistoryViewProps {
   onUpdateWorkout: (updated: WorkoutSession) => void;
   onDeleteWorkout: (workoutId: string) => void;
   onStartWorkout: () => void;
+  onExportJson?: () => void;
 }
 
 const SET_TYPE_ORDER: SetType[] = ['working', 'warmup', 'dropset', 'failure'];
@@ -94,6 +96,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   onUpdateWorkout,
   onDeleteWorkout,
   onStartWorkout,
+  onExportJson,
 }) => {
   const [splitFilter, setSplitFilter] = useState<
     'All' | WorkoutSession['splitTag']
@@ -101,6 +104,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   const [selectedDateStr, setSelectedDateStr] = useState<string | null>(null);
   const [expandedAllSetsMap, setExpandedAllSetsMap] = useState<Record<string, boolean>>({});
   const [editingWorkout, setEditingWorkout] = useState<WorkoutSession | null>(null);
+  const [editInputUnit, setEditInputUnit] = useState<WeightUnit>('kg');
+  const [editRawCell, setEditRawCell] = useState<{
+    key: string;
+    value: string;
+  } | null>(null);
   const [exerciseSearch, setExerciseSearch] = useState('');
 
   const recordedSplits = useMemo(() => {
@@ -293,10 +301,20 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   return (
     <div className="space-y-4 pb-6">
       {/* Page Title */}
-      <div className="px-0.5">
+      <div className="px-0.5 flex items-center justify-between gap-2">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
           Workouts
         </h1>
+        {onExportJson && (
+          <button
+            type="button"
+            onClick={onExportJson}
+            className="p-2 rounded-full bg-[#1c1c1e] hover:bg-[#2c2c2e] text-[#8e8e93] hover:text-white transition"
+            title="Backup workout history (JSON)"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Top Streak Counter & Interactive Monthly Calendar */}
@@ -790,20 +808,46 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                   Duration (min)
                 </label>
                 <input
-                  type="number"
-                  min={1}
-                  max={360}
-                  value={editingWorkout.durationMinutes}
-                  onChange={(e) =>
-                    setEditingWorkout({
-                      ...editingWorkout,
-                      durationMinutes: Math.max(
-                        1,
-                        parseInt(e.target.value, 10) || 1
-                      ),
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="45"
+                  value={
+                    editRawCell?.key === 'duration'
+                      ? editRawCell.value
+                      : editingWorkout.durationMinutes === 0
+                      ? ''
+                      : String(editingWorkout.durationMinutes)
+                  }
+                  onFocus={() =>
+                    setEditRawCell({
+                      key: 'duration',
+                      value:
+                        editingWorkout.durationMinutes === 0
+                          ? ''
+                          : String(editingWorkout.durationMinutes),
                     })
                   }
-                  className="w-full bg-[#2c2c2e] rounded-xl px-3 py-2 text-sm font-mono-num text-white focus:outline-none focus:ring-1 focus:ring-[#a4ff00]"
+                  onBlur={() => {
+                    setEditRawCell(null);
+                    if (!editingWorkout.durationMinutes || editingWorkout.durationMinutes < 1) {
+                      setEditingWorkout({
+                        ...editingWorkout,
+                        durationMinutes: 1,
+                      });
+                    }
+                  }}
+                  onChange={(e) => {
+                    const cleaned = e.target.value
+                      .replace(/[^0-9]/g, '')
+                      .replace(/^0+(?=\d)/, '');
+                    setEditRawCell({ key: 'duration', value: cleaned });
+                    const val = parseInt(cleaned, 10);
+                    setEditingWorkout({
+                      ...editingWorkout,
+                      durationMinutes: isNaN(val) ? 0 : Math.max(0, val),
+                    });
+                  }}
+                  className="w-full bg-[#2c2c2e] rounded-xl px-3 py-2 text-sm font-mono-num text-white placeholder-[#636366] focus:outline-none focus:ring-1 focus:ring-[#a4ff00]"
                 />
               </div>
 
@@ -900,39 +944,82 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 
                             <div className="col-span-5 flex items-center gap-1">
                               <input
-                                type="number"
-                                step="any"
-                                min={0}
-                                value={kgToDisplay(s.weightKg, unit)}
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0"
+                                value={
+                                  editRawCell?.key === `w-${s.id}`
+                                    ? editRawCell.value
+                                    : kgToDisplay(s.weightKg, editInputUnit) === 0
+                                    ? ''
+                                    : String(kgToDisplay(s.weightKg, editInputUnit))
+                                }
+                                onFocus={() => {
+                                  const disp = kgToDisplay(s.weightKg, editInputUnit);
+                                  setEditRawCell({
+                                    key: `w-${s.id}`,
+                                    value: disp === 0 ? '' : String(disp),
+                                  });
+                                }}
+                                onBlur={() => setEditRawCell(null)}
                                 onChange={(e) => {
-                                  const val = parseFloat(e.target.value);
+                                  const cleaned = e.target.value
+                                    .replace(/[^0-9.]/g, '')
+                                    .replace(/^0+(?=\d)/, '');
+                                  setEditRawCell({ key: `w-${s.id}`, value: cleaned });
+                                  const val = parseFloat(cleaned);
                                   handleUpdateEditSet(block.id, s.id, (cur) => ({
                                     ...cur,
                                     weightKg: isNaN(val)
                                       ? 0
-                                      : displayToKg(Math.max(0, val), unit),
+                                      : displayToKg(Math.max(0, val), editInputUnit),
                                   }));
                                 }}
-                                className="w-full bg-[#1c1c1e] rounded-lg px-2 py-1 text-center font-bold text-white"
+                                className="w-full bg-[#1c1c1e] rounded-lg px-2 py-1 text-center font-bold text-white placeholder-[#636366]"
                               />
-                              <span className="text-[10px] text-[#8e8e93] uppercase">
-                                {unit}
-                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditInputUnit((u) => (u === 'kg' ? 'lbs' : 'kg'))
+                                }
+                                title="Tap to toggle KG / LB input"
+                                className="text-[10px] font-bold text-[#a4ff00] uppercase px-1.5 py-0.5 rounded bg-[#1c1c1e] hover:bg-black shrink-0"
+                              >
+                                {editInputUnit}
+                              </button>
                             </div>
 
                             <div className="col-span-5 flex items-center gap-1">
                               <input
-                                type="number"
-                                min={0}
-                                value={s.reps}
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="0"
+                                value={
+                                  editRawCell?.key === `r-${s.id}`
+                                    ? editRawCell.value
+                                    : s.reps === 0
+                                    ? ''
+                                    : String(s.reps)
+                                }
+                                onFocus={() =>
+                                  setEditRawCell({
+                                    key: `r-${s.id}`,
+                                    value: s.reps === 0 ? '' : String(s.reps),
+                                  })
+                                }
+                                onBlur={() => setEditRawCell(null)}
                                 onChange={(e) => {
-                                  const val = parseInt(e.target.value, 10);
+                                  const cleaned = e.target.value
+                                    .replace(/[^0-9]/g, '')
+                                    .replace(/^0+(?=\d)/, '');
+                                  setEditRawCell({ key: `r-${s.id}`, value: cleaned });
+                                  const val = parseInt(cleaned, 10);
                                   handleUpdateEditSet(block.id, s.id, (cur) => ({
                                     ...cur,
                                     reps: isNaN(val) ? 0 : Math.max(0, val),
                                   }));
                                 }}
-                                className="w-full bg-[#1c1c1e] rounded-lg px-2 py-1 text-center font-bold text-white"
+                                className="w-full bg-[#1c1c1e] rounded-lg px-2 py-1 text-center font-bold text-white placeholder-[#636366]"
                               />
                               <span className="text-[10px] text-[#8e8e93]">
                                 reps
