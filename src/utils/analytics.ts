@@ -7,6 +7,7 @@ import {
   WorkoutSet,
 } from '../types/workout';
 import { calculateEstimated1RM } from './calculators';
+import { toLocalDateStr } from './dates';
 
 export interface ExerciseSessionDataPoint {
   sessionId: string;
@@ -382,12 +383,6 @@ export interface StreakAndRestSummary {
   recentWeeksGrid: DayActivityCell[][]; // 8 weeks of 7 days (Mon..Sun)
 }
 
-function toLocalDateStr(d: Date): string {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
 
 export function computeStreakAndRestStats(
   workouts: WorkoutSession[]

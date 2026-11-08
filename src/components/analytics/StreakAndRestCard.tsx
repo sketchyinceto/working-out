@@ -10,6 +10,8 @@ import {
 import { WorkoutSession } from '../../types/workout';
 import { computeStreakAndRestStats } from '../../utils/analytics';
 import { getSplitPalette } from '../../utils/splitTheme';
+import { toLocalDateStr } from '../../utils/dates';
+import { pluralize } from '../../utils/text';
 
 interface StreakAndRestCardProps {
   workouts: WorkoutSession[];
@@ -18,12 +20,6 @@ interface StreakAndRestCardProps {
   recordedSplits?: Set<string>;
 }
 
-function toLocalDateStr(d: Date): string {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
 
 export const StreakAndRestCard: React.FC<StreakAndRestCardProps> = ({
   workouts,
@@ -62,15 +58,8 @@ export const StreakAndRestCard: React.FC<StreakAndRestCardProps> = ({
         icon: 'zap' as const,
       };
     }
-    if (stats.daysSinceLastWorkout === 1) {
-      return {
-        label: '1 Rest Day',
-        style: 'bg-[#2c2c2e] text-white',
-        icon: 'moon' as const,
-      };
-    }
     return {
-      label: `${stats.daysSinceLastWorkout} Rest Days`,
+      label: pluralize(stats.daysSinceLastWorkout, 'Rest Day'),
       style: 'bg-[#2c2c2e] text-white',
       icon: 'moon' as const,
     };
@@ -156,7 +145,7 @@ export const StreakAndRestCard: React.FC<StreakAndRestCardProps> = ({
             </div>
             <div className="text-[11px] text-[#8e8e93] font-mono-num mt-0.5">
               This week:{' '}
-              <strong className="text-white">{stats.thisWeekWorkouts} lifts</strong>
+              <strong className="text-white">{pluralize(stats.thisWeekWorkouts, 'lift')}</strong>
               {' • '}
               <strong className="text-white">{stats.thisWeekRestDays} rest</strong>
             </div>
@@ -184,10 +173,10 @@ export const StreakAndRestCard: React.FC<StreakAndRestCardProps> = ({
             </h3>
             <div className="text-[11px] text-[#8e8e93] font-mono-num">
               <span className="text-[#a4ff00] font-semibold">
-                {calendarMonth.liftDaysCount} Lift Days
+                {pluralize(calendarMonth.liftDaysCount, 'Lift Day')}
               </span>
               {' • '}
-              <span>{calendarMonth.restDaysCount} Rest Days</span>
+              <span>{pluralize(calendarMonth.restDaysCount, 'Rest Day')}</span>
             </div>
           </div>
 

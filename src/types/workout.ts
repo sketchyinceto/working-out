@@ -41,6 +41,8 @@ export interface Exercise {
   cues?: string;
   targetRepRange: [number, number]; // e.g., [6, 10] or [8, 12]
   isCustom?: boolean;
+  /** Removed by the user but kept so old workouts that used it still display. */
+  isArchived?: boolean;
 }
 
 export interface WorkoutSet {

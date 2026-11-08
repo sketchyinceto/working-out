@@ -505,7 +505,10 @@ function buildExerciseSearchCorpus(ex: Exercise): string {
   ].join(' ');
 }
 
-export function searchExercises(exercises: Exercise[], query: string): Exercise[] {
+export function searchExercises(allExercises: Exercise[], query: string): Exercise[] {
+  // Exercises the user removed stay in the data (old workouts reference them)
+  // but are never offered in lists or pickers.
+  const exercises = allExercises.filter((ex) => !ex.isArchived);
   const trimmed = query.trim().toLowerCase();
   if (!trimmed) return exercises;
 

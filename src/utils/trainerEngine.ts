@@ -15,6 +15,7 @@ import {
   getWorkingSets,
 } from './analytics';
 import { kgToDisplay } from './calculators';
+import { pluralize } from './text';
 
 export type ProgressionStatus =
   | 'plateau'
@@ -276,11 +277,15 @@ export function evaluateExercisePrescription(
     allExercises.find(
       (e) =>
         e.id !== exercise.id &&
+        !e.isArchived &&
         e.primaryMuscle === exercise.primaryMuscle &&
         e.equipment !== exercise.equipment
     ) ||
     allExercises.find(
-      (e) => e.id !== exercise.id && e.primaryMuscle === exercise.primaryMuscle
+      (e) =>
+        e.id !== exercise.id &&
+        !e.isArchived &&
+        e.primaryMuscle === exercise.primaryMuscle
     );
 
   if (series.length === 0) {
@@ -632,7 +637,7 @@ export function generateTrainerEvaluation(
         routines.find((r) => r.splitTag === split) || routines[0];
 
       const candidateExercises = exercises.filter(
-        (e) => e.primaryMuscle === muscle
+        (e) => e.primaryMuscle === muscle && !e.isArchived
       );
 
       let status: 'under' | 'optimal' | 'over' = 'optimal';
@@ -642,7 +647,7 @@ export function generateTrainerEvaluation(
         status = 'under';
         const deficit = Math.ceil(landmark.min - weeklySets);
         const topPick = candidateExercises[0]?.name || 'an isolation movement';
-        coachAdvice = `${deficit} sets below minimum effective volume (${landmark.min} sets/wk). Add 3 sets of ${topPick} on ${split} day.`;
+        coachAdvice = `${pluralize(deficit, 'set')} below minimum effective volume (${landmark.min} sets/wk). Add 3 sets of ${topPick} on ${split} day.`;
       } else if (weeklySets > landmark.max) {
         status = 'over';
         coachAdvice = `High weekly volume (${weeklySets} sets/wk > ${landmark.max}). Monitor joint recovery and trim 2–3 junk sets if strength stalls.`;
@@ -1025,7 +1030,9 @@ export function generateTrainerEvaluation(
       recommendedRoutine,
       reason:
         daysSinceThisSplit !== null
-          ? `${daysSinceThisSplit} days recovery since last ${recommendedSplit} workout`
+          ? daysSinceThisSplit === 0
+            ? `You already trained ${recommendedSplit} today`
+            : `${pluralize(daysSinceThisSplit, 'day')} of recovery since your last ${recommendedSplit} workout`
           : `Next in your Push / Pull / Legs rotation`,
       daysSinceThisSplit,
       prescriptions,

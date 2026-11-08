@@ -64,3 +64,94 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
+
+/* Workout-complete celebration */
+@keyframes yk-confetti-fall {
+  0% {
+    transform: translate3d(0, -20px, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--yk-drift, 0px), 105vh, 0) rotate(var(--yk-spin, 540deg));
+    opacity: 0.9;
+  }
+}
+
+@keyframes yk-pop-in {
+  0% {
+    transform: scale(0.85) translateY(12px);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.02) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.yk-confetti-piece {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  animation: yk-confetti-fall var(--yk-duration, 2.6s) cubic-bezier(0.25, 0.6, 0.45, 1) var(--yk-delay, 0s) forwards;
+}
+
+.yk-pop-in {
+  animation: yk-pop-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yk-confetti-piece {
+    display: none;
+  }
+  .yk-pop-in {
+    animation: none;
+  }
+}
+
+/*
+ * iPhone safe areas. When the app is opened from the home screen it draws
+ * under the status bar (clock, battery) and the home bar, so anything pinned
+ * to the top or bottom edge needs that space added.
+ */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-header {
+  padding-top: var(--safe-top);
+}
+
+.safe-nav {
+  padding-bottom: var(--safe-bottom);
+}
+
+/* Room for the bottom tab bar (3.75rem) plus breathing space. */
+.safe-main {
+  padding-bottom: calc(6rem + var(--safe-bottom));
+}
+
+/* Floating bars that sit just above the bottom tab bar. */
+.safe-above-nav {
+  bottom: calc(4.25rem + var(--safe-bottom));
+}
+
+/* Sticky elements that sit just below the top header (3.25rem). */
+.safe-below-header {
+  top: calc(3.75rem + var(--safe-top));
+}
+
+/* Bottom sheets on phones: keep buttons clear of the home bar. */
+.safe-sheet {
+  padding-bottom: calc(1rem + var(--safe-bottom));
+}
+@media (min-width: 640px) {
+  .safe-sheet {
+    padding-bottom: 1.25rem;
+  }
+}

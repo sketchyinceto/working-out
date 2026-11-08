@@ -2,6 +2,7 @@ import React from 'react';
 import { MuscleGroup } from '../../types/workout';
 import { MUSCLE_LABELS } from '../../data/seedExercises';
 import { getMusclePalette, getMuscleVolumeShade } from '../../utils/splitTheme';
+import { pluralize } from '../../utils/text';
 
 interface MuscleHeatmapProps {
   volumes: Record<MuscleGroup, number>;
@@ -48,7 +49,7 @@ export const MuscleHeatmap: React.FC<MuscleHeatmapProps> = ({
               {MUSCLE_LABELS[selectedMuscle]}
             </span>
             <span className={`font-mono-num font-bold ${selectedPalette.textClass}`}>
-              {volumes[selectedMuscle]} sets
+              {pluralize(volumes[selectedMuscle], 'set')}
             </span>
           </div>
         )}

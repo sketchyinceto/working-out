@@ -14,12 +14,10 @@ node_modules
 dist
 dist-ssr
 *.zip
-.netlify
 
-# Local environment & stores
+# Local environment
 *.local
 .env*.local
-data/workout-store.json
 *.tsbuildinfo
 
 # OS & Editor

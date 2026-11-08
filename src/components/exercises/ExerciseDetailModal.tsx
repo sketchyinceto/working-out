@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Award, Sparkles, X } from 'lucide-react';
+import { Award, Pencil, Sparkles, X } from 'lucide-react';
 import { Exercise, WeightUnit, WorkoutSession } from '../../types/workout';
 import { MUSCLE_LABELS } from '../../data/seedExercises';
 import { getExerciseProgressionSeries } from '../../utils/analytics';
@@ -14,6 +14,8 @@ interface ExerciseDetailModalProps {
   workouts: WorkoutSession[];
   unit: WeightUnit;
   onClose: () => void;
+  /** Shown for custom exercises only. */
+  onEdit?: (exercise: Exercise) => void;
 }
 
 export const ExerciseDetailModal: React.FC<ExerciseDetailModalProps> = ({
@@ -21,6 +23,7 @@ export const ExerciseDetailModal: React.FC<ExerciseDetailModalProps> = ({
   workouts,
   unit,
   onClose,
+  onEdit,
 }) => {
   const palette = getMusclePalette(exercise.primaryMuscle);
 
@@ -51,7 +54,7 @@ export const ExerciseDetailModal: React.FC<ExerciseDetailModalProps> = ({
     >
       <div
         style={palette.cardGlowStyle}
-        className={`w-full max-w-2xl bg-[#1c1c1e] border-t sm:border ${palette.cardBorderClass} rounded-t-[26px] sm:rounded-[26px] p-4 sm:p-5 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl`}
+        className={`w-full max-w-2xl bg-[#1c1c1e] border-t sm:border ${palette.cardBorderClass} rounded-t-[26px] safe-sheet sm:rounded-[26px] p-4 sm:p-5 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-2">
@@ -72,6 +75,15 @@ export const ExerciseDetailModal: React.FC<ExerciseDetailModalProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {exercise.isCustom && onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(exercise)}
+                className="inline-flex items-center gap-1 px-3 py-2 rounded-full bg-[#2c2c2e] text-xs font-semibold text-white hover:bg-[#3a3a3c]"
+              >
+                <Pencil className="w-3.5 h-3.5" /> Edit
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}

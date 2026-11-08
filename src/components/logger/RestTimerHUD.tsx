@@ -52,7 +52,7 @@ export const RestTimerHUD: React.FC<RestTimerHUDProps> = ({
   const isFinished = remainingSeconds === 0;
 
   return (
-    <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-1.5rem)] max-w-md">
+    <div className="fixed safe-above-nav left-1/2 -translate-x-1/2 z-40 w-[calc(100%-1.5rem)] max-w-md">
       <div
         className={`rounded-[22px] border p-3 shadow-2xl backdrop-blur-2xl transition-all ${
           isFinished

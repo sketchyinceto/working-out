@@ -38,6 +38,7 @@ import { getMusclePalette, getSplitPalette } from '../../utils/splitTheme';
 import { evaluateExercisePrescription } from '../../utils/trainerEngine';
 import { ProgressionChart } from './ProgressionChart';
 import { MuscleHeatmap } from './MuscleHeatmap';
+import { toLocalDateStr } from '../../utils/dates';
 
 interface AnalyticsDashboardProps {
   workouts: WorkoutSession[];
@@ -181,12 +182,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     e.preventDefault();
     const val = parseFloat(bwInput);
     if (isNaN(val) || val <= 0) return;
-    // Today's date in the user's own time zone (toISOString() is UTC, which
-    // would file an early-morning weigh-in under yesterday in Asia).
-    const now = new Date();
-    const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     onAddBodyweight({
-      date: localDate,
+      // Local date: in UTC an early-morning weigh-in in Asia lands on yesterday.
+      date: toLocalDateStr(),
       bodyweightKg: displayToKg(val, bwInputUnit),
     });
     setShowWeighIn(false);
@@ -424,7 +422,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 : 'bg-[#2c2c2e] text-[#8e8e93] hover:text-white'
             }`}
           >
-            <Search className="w-3 h-3" /> Search ({exercises.length})
+            <Search className="w-3 h-3" /> Search ({exercises.filter((e) => !e.isArchived).length})
           </button>
 
           {KEY_LIFTS.map((item) => {
