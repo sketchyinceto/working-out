@@ -27,9 +27,8 @@ interface TrainerViewProps {
   unit: WeightUnit;
   profile?: TrainingProfile;
   programme?: ActiveProgramme | null;
-  onSetProgramme: (programme: ActiveProgramme | null) => void;
-  onChooseProgramme: () => void;
-  onEditSettings: () => void;
+  onOpenBuilder: () => void;
+  onRemoveProgramme: () => void;
   onSetWeek: (week: number) => void;
   onStartRoutine: (routine: Routine) => void;
   onSwapExercise: (oldExerciseId: string, replacement: Exercise, routineIds: string[]) => void;
@@ -44,9 +43,8 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
   unit,
   profile: savedProfile,
   programme,
-  onSetProgramme,
-  onChooseProgramme,
-  onEditSettings,
+  onOpenBuilder,
+  onRemoveProgramme,
   onSetWeek,
   onStartRoutine,
   onSwapExercise,
@@ -82,7 +80,8 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
         workouts
       );
     }
-    return buildWeekSchedule(profile, routines, workouts);
+    // No programme: show what's been done, with nothing planned.
+    return buildWeekSchedule({ ...profile, trainingDays: [], rotationRoutineIds: [] }, [], workouts);
   }, [profile, routines, workouts, programme, status]);
 
   return (
@@ -104,17 +103,17 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
       <ProgrammeCard
         status={status}
         bodyweightKg={bodyweightKg}
-        onChoose={onChooseProgramme}
-        onEnd={() => onSetProgramme(null)}
+        onChoose={onOpenBuilder}
+        onEnd={onRemoveProgramme}
         onSetWeek={onSetWeek}
       />
 
       <WeekSchedule
         days={week}
         profile={profile}
-        isCustomised={!!savedProfile}
+        hasProgramme={!!status && !status.finished}
         onStartRoutine={onStartRoutine}
-        onEditSettings={onEditSettings}
+        onOpenBuilder={onOpenBuilder}
       />
 
       <StallAlerts

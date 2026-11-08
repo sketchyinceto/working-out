@@ -9,9 +9,10 @@ import { toLocalDateStr } from '../../utils/dates';
 interface WeekScheduleProps {
   days: ScheduleDay[];
   profile: TrainingProfile;
-  isCustomised: boolean;
+  /** Without a programme there's no plan, just what you've done. */
+  hasProgramme: boolean;
   onStartRoutine: (routine: Routine) => void;
-  onEditSettings: () => void;
+  onOpenBuilder: () => void;
 }
 
 const STATUS_STYLE: Record<ScheduleDay['status'], string> = {
@@ -26,9 +27,9 @@ const STATUS_STYLE: Record<ScheduleDay['status'], string> = {
 export const WeekSchedule: React.FC<WeekScheduleProps> = ({
   days,
   profile,
-  isCustomised,
+  hasProgramme,
   onStartRoutine,
-  onEditSettings,
+  onOpenBuilder,
 }) => {
   const today = days.find((d) => d.status === 'today');
   const upcoming = days.filter((d) => d.plannedRoutine && d.status !== 'today');
@@ -43,21 +44,23 @@ export const WeekSchedule: React.FC<WeekScheduleProps> = ({
             This Week
           </h2>
           <p className="text-[11px] text-[#8e8e93]">
-            {done} of {planned} sessions · {GOAL_LABELS[profile.goal]}
+            {hasProgramme
+              ? `${done} of ${planned} sessions · ${GOAL_LABELS[profile.goal]}`
+              : `${done} workout${done === 1 ? '' : 's'} logged this week`}
           </p>
         </div>
         <button
           type="button"
-          onClick={onEditSettings}
+          onClick={onOpenBuilder}
           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#2c2c2e] text-[11px] font-semibold text-white whitespace-nowrap shrink-0"
         >
-          <Settings2 className="w-3.5 h-3.5" /> Goal & Schedule
+          <Settings2 className="w-3.5 h-3.5" /> Programme Builder
         </button>
       </div>
 
-      {!isCustomised && (
+      {!hasProgramme && (
         <p className="text-[11px] text-[#ffe620] bg-[#ffe620]/10 rounded-xl px-3 py-2">
-          Using a default plan (Push/Pull/Legs, Mon–Sat). Tap Goal & Schedule to set your own.
+          No programme yet, so there's no weekly plan. Open the Programme Builder to plan your week.
         </p>
       )}
 
@@ -78,7 +81,8 @@ export const WeekSchedule: React.FC<WeekScheduleProps> = ({
         ))}
       </div>
 
-      {today?.plannedRoutine ? (
+      {hasProgramme &&
+        (today?.plannedRoutine ? (
         <button
           type="button"
           onClick={() => onStartRoutine(today.plannedRoutine!)}
@@ -92,7 +96,7 @@ export const WeekSchedule: React.FC<WeekScheduleProps> = ({
             ? 'Done for today. Nice work.'
             : 'Rest day today. Recovery is when the growth happens.'}
         </p>
-      )}
+      ))}
 
       {upcoming.length > 0 && (
         <div className="space-y-1">

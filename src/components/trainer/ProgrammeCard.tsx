@@ -42,15 +42,16 @@ export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
           <h2 className="text-sm font-bold text-white">Programme</h2>
         </div>
         <p className="text-xs text-[#d1d1d6]">
-          Follow a long-term plan. Each week it sets your sets, rep ranges, effort, deloads and
-          nutrition targets, applied automatically when you start a routine.
+          Set your goal, training days and experience, and a long-term programme is built for you:
+          a weekly workout plan, deloads, nutrition targets, and automatic adjustments after every
+          session.
         </p>
         <button
           type="button"
           onClick={onChoose}
           className="w-full py-2.5 rounded-full bg-[#a4ff00] text-black font-bold text-xs"
         >
-          Choose a Programme
+          Build Your Programme
         </button>
       </section>
     );
@@ -67,7 +68,7 @@ export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
         </p>
         <div className="flex gap-2">
           <button type="button" onClick={onChoose} className="flex-1 py-2.5 rounded-full bg-[#a4ff00] text-black font-bold text-xs">
-            Choose Next Programme
+            Build Next Programme
           </button>
           <button type="button" onClick={onEnd} className="px-4 py-2.5 rounded-full bg-[#2c2c2e] text-white font-semibold text-xs">
             Clear
@@ -120,7 +121,7 @@ export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
           onClick={onChoose}
           className="px-3 py-1.5 rounded-full bg-[#2c2c2e] text-[11px] font-semibold text-white shrink-0"
         >
-          Change
+          Edit
         </button>
       </div>
 
@@ -223,11 +224,11 @@ export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
           <button
             type="button"
             onClick={() => {
-              if (window.confirm(`Stop following "${template.name}"? Your workouts are kept.`)) onEnd();
+              onEnd();
             }}
             className="w-full py-2 rounded-full bg-[#fa114f]/15 text-[#fa114f] text-xs font-bold"
           >
-            End Programme
+            Remove Programme
           </button>
         </div>
       )}

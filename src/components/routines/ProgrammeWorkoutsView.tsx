@@ -26,9 +26,8 @@ interface ProgrammeWorkoutsViewProps {
   exercises: Exercise[];
   workouts: WorkoutSession[];
   unit: WeightUnit;
-  onChooseProgramme: () => void;
-  onStartProgramme: (template: ProgrammeTemplate) => void;
-  onEditSettings: () => void;
+  onOpenBuilder: () => void;
+  onRemoveProgramme: () => void;
   onSetWeek: (week: number) => void;
   onStartWorkout: (workoutId: string) => void;
   onAcceptSwap: (slotId: string, exerciseId: string) => void;
@@ -42,9 +41,8 @@ export const ProgrammeWorkoutsView: React.FC<ProgrammeWorkoutsViewProps> = ({
   exercises,
   workouts,
   unit,
-  onChooseProgramme,
-  onStartProgramme,
-  onEditSettings,
+  onOpenBuilder,
+  onRemoveProgramme,
   onSetWeek,
   onStartWorkout,
   onAcceptSwap,
@@ -78,17 +76,17 @@ export const ProgrammeWorkoutsView: React.FC<ProgrammeWorkoutsViewProps> = ({
         </p>
         <button
           type="button"
-          onClick={() => onStartProgramme(designed)}
+          onClick={onOpenBuilder}
           className="w-full py-2.5 rounded-full bg-[#a4ff00] text-black font-bold text-xs"
         >
-          Start {designed.name}
+          Open Programme Builder
         </button>
         <div className="flex gap-2">
-          <button type="button" onClick={onEditSettings} className="flex-1 py-2 rounded-full bg-[#2c2c2e] text-white text-xs font-semibold">
-            Edit Goal & Schedule
+          <button type="button" onClick={onOpenBuilder} className="flex-1 py-2 rounded-full bg-[#2c2c2e] text-white text-xs font-semibold">
+            Programme Builder
           </button>
-          <button type="button" onClick={onChooseProgramme} className="flex-1 py-2 rounded-full bg-[#2c2c2e] text-white text-xs font-semibold">
-            Other Programmes
+          <button type="button" onClick={onOpenBuilder} className="flex-1 py-2 rounded-full bg-[#2c2c2e] text-white text-xs font-semibold">
+            Programme Builder
           </button>
         </div>
       </div>
@@ -99,7 +97,7 @@ export const ProgrammeWorkoutsView: React.FC<ProgrammeWorkoutsViewProps> = ({
     return (
       <div className="af-card p-5 text-center space-y-3">
         <h2 className="text-base font-bold text-white">{status.template.name} complete</h2>
-        <button type="button" onClick={onChooseProgramme} className="w-full py-2.5 rounded-full bg-[#a4ff00] text-black font-bold text-xs">
+        <button type="button" onClick={onOpenBuilder} className="w-full py-2.5 rounded-full bg-[#a4ff00] text-black font-bold text-xs">
           Choose Next Programme
         </button>
       </div>
@@ -126,7 +124,7 @@ export const ProgrammeWorkoutsView: React.FC<ProgrammeWorkoutsViewProps> = ({
             <h2 className="text-base font-bold text-white leading-tight">{week.block}</h2>
             <p className="text-[11px] text-[#8e8e93] truncate">{status.template.name}</p>
           </div>
-          <button type="button" onClick={onChooseProgramme} className="px-3 py-1.5 rounded-full bg-[#2c2c2e] text-[11px] font-semibold text-white shrink-0">
+          <button type="button" onClick={onOpenBuilder} className="px-3 py-1.5 rounded-full bg-[#2c2c2e] text-[11px] font-semibold text-white shrink-0">
             Change
           </button>
         </div>
@@ -148,7 +146,7 @@ export const ProgrammeWorkoutsView: React.FC<ProgrammeWorkoutsViewProps> = ({
           </div>
           <button
             type="button"
-            onClick={onEditSettings}
+            onClick={onOpenBuilder}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-[#2c2c2e] text-[11px] font-semibold text-white shrink-0"
           >
             <Settings2 className="w-3.5 h-3.5" /> Edit
@@ -262,6 +260,13 @@ export const ProgrammeWorkoutsView: React.FC<ProgrammeWorkoutsViewProps> = ({
         all sets and the weight goes up; land in range and you aim for one more rep; fall short and
         the weight drops ~5%. Sets and rest adjust too, and stalled lifts get a swap suggestion.
       </p>
+      <button
+        type="button"
+        onClick={onRemoveProgramme}
+        className="w-full py-2.5 rounded-full bg-[#fa114f]/15 text-[#fa114f] text-xs font-bold"
+      >
+        Remove Programme
+      </button>
     </div>
   );
 };
