@@ -121,7 +121,23 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
         if (s.id !== setId) return s;
         const updated = updater(s, block);
         if (updated.completed && updated.type !== 'warmup') {
-          updated.prs = evaluateSetPRs(block.exerciseId, updated, workouts);
+          // Compare against history *and* the other sets already done in this
+          // session, so three identical sets don't all show as PRs.
+          const thisSession: WorkoutSession = {
+            id: draft.id,
+            name: draft.name,
+            startTime: draft.startTime,
+            endTime: draft.startTime,
+            durationMinutes: 0,
+            exercises: draft.exercises.map((b) => ({
+              ...b,
+              sets: b.sets.filter((other) => other.completed && other.id !== setId),
+            })),
+          };
+          updated.prs = evaluateSetPRs(block.exerciseId, updated, [
+            thisSession,
+            ...workouts,
+          ]);
         } else {
           updated.prs = undefined;
         }
@@ -266,6 +282,28 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
       : [-5, -2.5, +2.5, +5, +10];
   const repSteps = [-2, -1, +1, +2];
 
+  // Coach insights depend only on history, not on the live set inputs, so
+  // compute them once per exercise instead of on every one-second tick.
+  const exerciseIdsKey = draft.exercises.map((b) => b.exerciseId).join('|');
+  const insightsByExercise = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        lastPerf: ReturnType<typeof getLastPerformedExerciseBlock>;
+        statDiag: ReturnType<typeof evaluateExercisePrescription>;
+      }
+    >();
+    for (const exerciseId of new Set(exerciseIdsKey.split('|'))) {
+      const meta = exerciseMap.get(exerciseId);
+      if (!meta) continue;
+      map.set(exerciseId, {
+        lastPerf: getLastPerformedExerciseBlock(meta.id, workouts),
+        statDiag: evaluateExercisePrescription(meta, workouts, exercises, unit),
+      });
+    }
+    return map;
+  }, [exerciseIdsKey, exerciseMap, workouts, exercises, unit]);
+
   const filteredExercises = useMemo(
     () => searchExercises(exercises, exerciseSearch),
     [exercises, exerciseSearch]
@@ -347,13 +385,9 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
           if (!meta) return null;
 
           const exPalette = getMusclePalette(meta.primaryMuscle);
-          const lastPerf = getLastPerformedExerciseBlock(meta.id, workouts);
-          const statDiag = evaluateExercisePrescription(
-            meta,
-            workouts,
-            exercises,
-            unit
-          );
+          const insight = insightsByExercise.get(meta.id);
+          if (!insight) return null;
+          const { lastPerf, statDiag } = insight;
           const previousWorkingSets = lastPerf
             ? lastPerf.exerciseBlock.sets.filter((s) => s.type !== 'warmup')
             : [];
@@ -692,6 +726,7 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
                           onBlur={() => setEditingRawValue(null)}
                           onChange={(e) => {
                             const cleaned = e.target.value
+                              .replace(/,/g, '.')
                               .replace(/[^0-9.]/g, '')
                               .replace(/^0+(?=\d)/, '');
                             setEditingRawValue(cleaned);

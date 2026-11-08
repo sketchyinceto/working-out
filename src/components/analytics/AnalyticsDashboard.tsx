@@ -181,8 +181,12 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     e.preventDefault();
     const val = parseFloat(bwInput);
     if (isNaN(val) || val <= 0) return;
+    // Today's date in the user's own time zone (toISOString() is UTC, which
+    // would file an early-morning weigh-in under yesterday in Asia).
+    const now = new Date();
+    const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     onAddBodyweight({
-      date: new Date().toISOString().slice(0, 10),
+      date: localDate,
       bodyweightKg: displayToKg(val, bwInputUnit),
     });
     setShowWeighIn(false);

@@ -1,35 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, SkipForward, Timer } from 'lucide-react';
 import { RestTimerState } from '../../types/workout';
+import { playCompletionChime } from '../../utils/sound';
 
 interface RestTimerHUDProps {
   timer: RestTimerState;
   onAdjustSeconds: (deltaSeconds: number) => void;
   onDismiss: () => void;
-}
-
-function playCompletionChime() {
-  try {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const now = ctx.currentTime;
-
-    [523.25, 659.25, 783.99].forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now + idx * 0.12);
-      gain.gain.setValueAtTime(0.15, now + idx * 0.12);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.35);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now + idx * 0.12);
-      osc.stop(now + idx * 0.12 + 0.36);
-    });
-  } catch {
-    // Ignore audio context restriction if un-interacted
-  }
 }
 
 export const RestTimerHUD: React.FC<RestTimerHUDProps> = ({

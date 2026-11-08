@@ -129,4 +129,6 @@ export interface AppDatabaseState {
   measurements: BodyMeasurementEntry[];
   activeWorkout: ActiveWorkoutDraft | null;
   isDemoData: boolean;
+  /** Starter routines the user deleted, so they aren't re-added on the next load. */
+  deletedStarterRoutineIds?: string[];
 }

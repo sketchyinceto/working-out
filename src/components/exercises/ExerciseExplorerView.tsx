@@ -30,9 +30,25 @@ interface ExerciseExplorerViewProps {
   onAddCustomExercise: (ex: Exercise) => void;
 }
 
+// Checks run from most specific to least specific, because many keywords
+// contain each other ("lateral delt" contains "lat", "forearm" contains "arm",
+// "lower back" contains "back").
 function parseMuscleInput(input: string): MuscleGroup {
   const s = input.trim().toLowerCase();
   if (s.includes('chest') || s.includes('pec')) return 'chest';
+  if (s.includes('lower back') || s.includes('erector') || s.includes('lumbar'))
+    return 'lower_back';
+  if (s.includes('front delt') || s.includes('anterior delt')) return 'front_delts';
+  if (s.includes('rear delt') || s.includes('posterior delt')) return 'rear_delts';
+  if (
+    s.includes('side delt') ||
+    s.includes('lateral delt') ||
+    s.includes('shoulder') ||
+    s.includes('delt')
+  )
+    return 'side_delts';
+  if (s.includes('forearm') || s.includes('wrist') || s.includes('grip'))
+    return 'forearms';
   if (s.includes('lat') || s.includes('wing')) return 'lats';
   if (
     s.includes('trap') ||
@@ -41,37 +57,24 @@ function parseMuscleInput(input: string): MuscleGroup {
     s.includes('back')
   )
     return 'upper_back';
-  if (s.includes('front delt') || s.includes('anterior delt')) return 'front_delts';
-  if (
-    s.includes('side delt') ||
-    s.includes('lateral delt') ||
-    s.includes('shoulder')
-  )
-    return 'side_delts';
-  if (s.includes('rear delt') || s.includes('posterior delt')) return 'rear_delts';
-  if (s.includes('tricep') || s.includes('tri')) return 'triceps';
-  if (s.includes('bicep') || s.includes('arm')) return 'biceps';
-  if (s.includes('forearm') || s.includes('wrist') || s.includes('grip'))
-    return 'forearms';
+  // Before triceps: "hamstrings" contains "tri".
   if (s.includes('quad') || s.includes('thigh')) return 'quads';
   if (s.includes('hamstring') || s.includes('ham')) return 'hamstrings';
   if (s.includes('glute') || s.includes('butt') || s.includes('hip')) return 'glutes';
   if (s.includes('calf') || s.includes('calves')) return 'calves';
+  if (s.includes('tricep') || s.includes('tri')) return 'triceps';
+  if (s.includes('bicep') || s.includes('arm')) return 'biceps';
   if (s.includes('ab') || s.includes('core') || s.includes('oblique')) return 'abs';
-  if (
-    s.includes('lower back') ||
-    s.includes('erector') ||
-    s.includes('lumbar')
-  )
-    return 'lower_back';
   return 'chest';
 }
 
 function parseEquipInput(input: string): EquipmentType {
   const s = input.trim().toLowerCase();
   if (s.includes('smith')) return 'smith_machine';
-  if (s.includes('barbell') || s.includes('bb') || s.includes('bar')) return 'barbell';
+  if (s.includes('ez')) return 'ez_bar';
+  // Before barbell: "dumbbell" contains "bb".
   if (s.includes('dumbbell') || s.includes('db')) return 'dumbbell';
+  if (s.includes('barbell') || s.includes('bb') || s.includes('bar')) return 'barbell';
   if (s.includes('cable') || s.includes('pulley')) return 'cable';
   if (s.includes('machine') || s.includes('lever') || s.includes('plate loaded'))
     return 'machine';
@@ -82,7 +85,6 @@ function parseEquipInput(input: string): EquipmentType {
     s.includes('body')
   )
     return 'bodyweight';
-  if (s.includes('ez')) return 'ez_bar';
   return 'dumbbell';
 }
 

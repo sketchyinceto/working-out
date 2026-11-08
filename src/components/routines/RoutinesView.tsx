@@ -189,11 +189,32 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
         : formSplit === 'Upper' || formSplit === 'Lower'
         ? 'Upper / Lower'
         : 'Custom';
+    const existing = editingRoutineId
+      ? routines.find((r) => r.id === editingRoutineId)
+      : undefined;
+    // Keep a routine's own colour unless its split changed.
     const accentColor =
-      formSplit === 'Push' ? 'emerald' : formSplit === 'Pull' ? 'sky' : 'violet';
+      existing && existing.splitTag === formSplit
+        ? existing.accentColor
+        : formSplit === 'Push'
+        ? 'emerald'
+        : formSplit === 'Pull'
+        ? 'sky'
+        : 'violet';
+
+    // Fix half-edited fields (blank sets, min reps above max, etc.).
+    const cleanedItems: RoutineExerciseTemplate[] = formItems.map((item) => {
+      const minReps = Math.max(1, item.targetRepRange[0] || 8);
+      const maxReps = Math.max(minReps, item.targetRepRange[1] || minReps);
+      return {
+        ...item,
+        targetSets: Math.max(1, item.targetSets || 3),
+        targetRepRange: [minReps, maxReps],
+        restSeconds: item.restSeconds >= 15 ? item.restSeconds : 90,
+      };
+    });
 
     if (editingRoutineId) {
-      const existing = routines.find((r) => r.id === editingRoutineId);
       onUpdateRoutine({
         id: editingRoutineId,
         name: formName.trim(),
@@ -201,7 +222,7 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
         splitTag: formSplit,
         description: existing?.description || '',
         accentColor,
-        exercises: formItems,
+        exercises: cleanedItems,
       });
     } else {
       onCreateRoutine({
@@ -211,7 +232,7 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
         splitTag: formSplit,
         description: '',
         accentColor,
-        exercises: formItems,
+        exercises: cleanedItems,
       });
     }
 
@@ -803,6 +824,9 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
                     <button
                       type="button"
                       onClick={() => {
+                        if (!window.confirm(`Delete the routine "${formName}"?`)) {
+                          return;
+                        }
                         onDeleteRoutine(editingRoutineId);
                         setShowModal(false);
                       }}

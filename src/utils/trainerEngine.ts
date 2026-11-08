@@ -92,7 +92,7 @@ export interface TrainerTimePoint {
 
 export interface TrainerEvaluationReport {
   overallScore: number;
-  gradeLabel: 'Elite' | 'Optimal' | 'Building' | 'Recovery Needed';
+  gradeLabel: 'Elite' | 'Optimal' | 'Building' | 'Needs Work';
   consistencyScore: number;
   overloadScore: number;
   balanceScore: number;
@@ -906,7 +906,7 @@ export function generateTrainerEvaluation(
       ? 'Optimal'
       : overallScore >= 55
       ? 'Building'
-      : 'Recovery Needed';
+      : 'Needs Work';
 
   const readinessStatus: TrainerEvaluationReport['readinessStatus'] =
     streakStats.daysSinceLastWorkout === 0

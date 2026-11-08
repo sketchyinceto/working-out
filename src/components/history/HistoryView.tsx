@@ -280,7 +280,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   );
 
   const filteredWorkouts = useMemo(() => {
-    return workouts.filter((w) => {
+    const newestFirst = [...workouts].sort(
+      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+    );
+    return newestFirst.filter((w) => {
       if (selectedDateStr) {
         return toLocalDateStr(new Date(w.startTime)) === selectedDateStr;
       }
@@ -964,6 +967,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                                 onBlur={() => setEditRawCell(null)}
                                 onChange={(e) => {
                                   const cleaned = e.target.value
+                                    .replace(/,/g, '.')
                                     .replace(/[^0-9.]/g, '')
                                     .replace(/^0+(?=\d)/, '');
                                   setEditRawCell({ key: `w-${s.id}`, value: cleaned });
@@ -1093,6 +1097,13 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  if (
+                    !window.confirm(
+                      `Delete "${editingWorkout.name}"? This can't be undone.`
+                    )
+                  ) {
+                    return;
+                  }
                   onDeleteWorkout(editingWorkout.id);
                   setEditingWorkout(null);
                 }}

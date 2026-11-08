@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BarChart3,
   BookOpen,
@@ -37,6 +37,12 @@ import { ExerciseExplorerView } from './components/exercises/ExerciseExplorerVie
 import { ExerciseDetailModal } from './components/exercises/ExerciseDetailModal';
 import { TrainerView } from './components/trainer/TrainerView';
 import { ExercisePrescription } from './utils/trainerEngine';
+import {
+  isStarterRoutineId,
+  mergeStates,
+  normalizeState,
+} from './utils/normalizeState';
+import { primeAudio } from './utils/sound';
 
 type NavTab =
   | 'analytics'
@@ -46,9 +52,15 @@ type NavTab =
   | 'history'
   | 'exercises';
 
-const LOCAL_STORAGE_KEY = 'apex_lift_tracker_v2';
+// Older versions kept everyone's data under this one key (and mirrored the
+// active user's data into it). It is now only read once, to migrate it.
+const LEGACY_STORAGE_KEY = 'apex_lift_tracker_v2';
 const CURRENT_USER_KEY = 'yk_lifts_current_user';
 const CLOUD_URL_KEY = 'yk_lifts_cloud_db_url';
+// Set while this device has changes the cloud hasn't confirmed yet.
+const PENDING_SYNC_PREFIX = 'yk_lifts_pending_sync_';
+const CLOUD_SAVE_DEBOUNCE_MS = 800;
+const CLOUD_RETRY_INTERVAL_MS = 30_000;
 
 // Paste your Google Cloud / Firebase Realtime Database URL here (e.g. "https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app")
 const DEFAULT_CLOUD_DB_URL = 'https://yk-lifts-6416e-default-rtdb.asia-southeast1.firebasedatabase.app';
@@ -62,24 +74,39 @@ function normalizeUserKey(name: string): string {
 
 function getUserStorageKey(userName: string): string {
   const key = normalizeUserKey(userName);
-  return key ? `${LOCAL_STORAGE_KEY}_${key}` : LOCAL_STORAGE_KEY;
+  return key ? `${LEGACY_STORAGE_KEY}_${key}` : LEGACY_STORAGE_KEY;
+}
+
+function isSyncPending(userKey: string): boolean {
+  try {
+    return localStorage.getItem(PENDING_SYNC_PREFIX + userKey) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setSyncPending(userKey: string, pending: boolean) {
+  try {
+    if (pending) localStorage.setItem(PENDING_SYNC_PREFIX + userKey, '1');
+    else localStorage.removeItem(PENDING_SYNC_PREFIX + userKey);
+  } catch {
+    // Ignore
+  }
 }
 
 function loadLocalUserState(userName: string): AppDatabaseState {
   try {
-    const userStorageKey = getUserStorageKey(userName);
-    const cached =
-      localStorage.getItem(userStorageKey) ||
-      localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (cached) {
-      const parsed = JSON.parse(cached) as AppDatabaseState;
-      return {
-        ...parsed,
-        unit: 'kg',
-        exercises: ensureSeedExercises(parsed.exercises || SEED_EXERCISES),
-        routines: ensureStarterRoutines(parsed.routines || []),
-      };
+    const userKey = normalizeUserKey(userName);
+    const own = localStorage.getItem(getUserStorageKey(userName));
+    const legacy = userKey ? localStorage.getItem(LEGACY_STORAGE_KEY) : null;
+    if (legacy && userKey) {
+      // Hand the legacy copy to this user only if they have nothing of their
+      // own, then retire it so it can't leak into another profile.
+      if (!own) localStorage.setItem(getUserStorageKey(userName), legacy);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
     }
+    const cached = own || legacy;
+    if (cached) return normalizeState(JSON.parse(cached));
   } catch {
     // Fallback
   }
@@ -96,18 +123,6 @@ function buildInitialState(withDemo = false): AppDatabaseState {
     activeWorkout: null,
     isDemoData: withDemo,
   };
-}
-
-function ensureStarterRoutines(existing: Routine[]): Routine[] {
-  const existingIds = new Set(existing.map((r) => r.id));
-  const missingStarters = STARTER_ROUTINES.filter((r) => !existingIds.has(r.id));
-  return [...missingStarters, ...existing];
-}
-
-function ensureSeedExercises(existing: Exercise[]): Exercise[] {
-  const existingIds = new Set(existing.map((e) => e.id));
-  const missingSeeds = SEED_EXERCISES.filter((e) => !existingIds.has(e.id));
-  return [...existing, ...missingSeeds];
 }
 
 export const App: React.FC = () => {
@@ -140,6 +155,9 @@ export const App: React.FC = () => {
   const [state, setState] = useState<AppDatabaseState>(() =>
     loadLocalUserState(userName)
   );
+  // Which profile `state` currently belongs to. While switching users there is
+  // one render where userName is new but state is still the old user's.
+  const [stateOwner, setStateOwner] = useState<string>(userName);
 
   const [activeTab, setActiveTab] = useState<NavTab>('analytics');
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
@@ -149,105 +167,212 @@ export const App: React.FC = () => {
     totalDurationSeconds: 120,
     exerciseName: '',
   });
-  const isHydratingRef = React.useRef(true);
-  const lastSavedJsonRef = React.useRef<string>('');
 
-  // Hydrate data whenever userName or cloudDbUrl changes
+  // --- Cloud sync bookkeeping ---
+  const isHydratingRef = useRef(true);
+  // True once the cloud copy for the current profile has been read. Until then
+  // nothing is uploaded, so a device that starts offline can't overwrite
+  // newer data from another device with its stale copy.
+  const cloudReadOkRef = useRef(false);
+  const pullsInFlightRef = useRef(0);
+  const currentUserKeyRef = useRef(normalizeUserKey(userName));
+  const lastQueuedJsonRef = useRef<string>('');
+  const latestStateRef = useRef<AppDatabaseState>(state);
+  const saveTimerRef = useRef<{ id: number; userKey: string } | null>(null);
+  const inFlightRef = useRef(false);
+  const queuedSavesRef = useRef(new Map<string, AppDatabaseState>());
+
+  const remoteEndpoint = useCallback(
+    (userKey: string) =>
+      cloudDbUrl
+        ? `${cloudDbUrl}/users/${userKey}.json`
+        : `/api/store?user=${encodeURIComponent(userKey)}`,
+    [cloudDbUrl]
+  );
+
+  // Upload one snapshot. Requests never overlap, so an older save can't land
+  // after a newer one; saves requested mid-flight are sent next.
+  const pushToCloud = useCallback(
+    (userKey: string, snapshot: AppDatabaseState) => {
+      if (!userKey) return;
+      if (inFlightRef.current) {
+        queuedSavesRef.current.set(userKey, snapshot);
+        return;
+      }
+      inFlightRef.current = true;
+      const body = JSON.stringify(snapshot);
+      setSyncStatus('syncing');
+      fetch(remoteEndpoint(userKey), {
+        method: cloudDbUrl ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        // Lets a save finish even if the page is being closed (64 KB limit).
+        keepalive: body.length < 60_000,
+      })
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          // Only clear the flag if nothing newer is waiting to be sent.
+          if (!queuedSavesRef.current.has(userKey)) setSyncPending(userKey, false);
+          setSyncStatus('synced');
+        })
+        .catch(() => setSyncStatus('error'))
+        .finally(() => {
+          inFlightRef.current = false;
+          const next = queuedSavesRef.current.entries().next();
+          if (!next.done) {
+            const [nextKey, nextSnapshot] = next.value;
+            queuedSavesRef.current.delete(nextKey);
+            pushToCloud(nextKey, nextSnapshot);
+          }
+        });
+    },
+    [cloudDbUrl, remoteEndpoint]
+  );
+
+  // Read the cloud copy and reconcile it with this device's copy.
+  const pullFromCloud = useCallback(
+    (userKey: string, isCancelled: () => boolean) => {
+      pullsInFlightRef.current += 1;
+      setSyncStatus('syncing');
+      return fetch(remoteEndpoint(userKey))
+        .then((res) => {
+          // The local dev store answers 404 for a brand-new user.
+          if (res.status === 404 && !cloudDbUrl) return null;
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then((serverData) => {
+          if (isCancelled()) return;
+          cloudReadOkRef.current = true;
+          const hasServerData =
+            serverData && typeof serverData === 'object' && !serverData.empty;
+
+          if (!hasServerData) {
+            // Nothing in the cloud for this user yet: upload this device's copy.
+            setSyncPending(userKey, true);
+            pushToCloud(userKey, latestStateRef.current);
+            return;
+          }
+
+          const server = normalizeState(serverData);
+          const next = isSyncPending(userKey)
+            ? // This device has changes that never reached the cloud (e.g.
+              // logged with no signal): keep both sides' new data.
+              mergeStates(latestStateRef.current, server)
+            : server;
+          lastQueuedJsonRef.current = JSON.stringify(next);
+          latestStateRef.current = next;
+          setState(next);
+          if (isSyncPending(userKey)) pushToCloud(userKey, next);
+          else setSyncStatus('synced');
+        })
+        .catch(() => {
+          // Couldn't read the cloud: keep using the local copy. Retried below.
+          if (!isCancelled()) setSyncStatus('error');
+        })
+        .finally(() => {
+          pullsInFlightRef.current -= 1;
+        });
+    },
+    [cloudDbUrl, remoteEndpoint, pushToCloud]
+  );
+
+  const flushScheduledSave = useCallback(() => {
+    const scheduled = saveTimerRef.current;
+    if (!scheduled) return;
+    window.clearTimeout(scheduled.id);
+    saveTimerRef.current = null;
+    if (cloudReadOkRef.current) pushToCloud(scheduled.userKey, latestStateRef.current);
+  }, [pushToCloud]);
+
+  // Load the profile: local copy first (instant), then the cloud copy.
   useEffect(() => {
+    // Anything still waiting to be saved belongs to the previous profile.
+    flushScheduledSave();
+
     const userKey = normalizeUserKey(userName);
+    currentUserKeyRef.current = userKey;
+    let cancelled = false;
     isHydratingRef.current = true;
+    cloudReadOkRef.current = false;
     const localState = loadLocalUserState(userName);
+    lastQueuedJsonRef.current = JSON.stringify(localState);
+    latestStateRef.current = localState;
     setState(localState);
+    setStateOwner(userName);
 
     if (!userKey) {
       isHydratingRef.current = false;
       return;
     }
 
-    const endpoint = cloudDbUrl
-      ? `${cloudDbUrl}/users/${userKey}.json`
-      : `/api/store?user=${encodeURIComponent(userKey)}`;
+    pullFromCloud(userKey, () => cancelled).finally(() => {
+      if (!cancelled) isHydratingRef.current = false;
+    });
 
-    if (cloudDbUrl) setSyncStatus('syncing');
+    return () => {
+      cancelled = true;
+    };
+  }, [userName, cloudDbUrl, pullFromCloud, flushScheduledSave]);
 
-    fetch(endpoint)
-      .then((res) => {
-        if (res.ok) return res.json();
-        return null;
-      })
-      .then((serverData) => {
-        if (serverData && typeof serverData === 'object' && !serverData.empty) {
-          const hydrated: AppDatabaseState = {
-            ...localState,
-            ...serverData,
-            unit: 'kg',
-            workouts: Array.isArray(serverData.workouts)
-              ? serverData.workouts
-              : localState.workouts,
-            measurements: Array.isArray(serverData.measurements)
-              ? serverData.measurements
-              : localState.measurements,
-            exercises: ensureSeedExercises(serverData.exercises || SEED_EXERCISES),
-            routines: ensureStarterRoutines(serverData.routines || []),
-          };
-          lastSavedJsonRef.current = JSON.stringify(hydrated);
-          setState(hydrated);
-          if (cloudDbUrl) setSyncStatus('synced');
-        } else if (cloudDbUrl) {
-          // User doesn't exist in cloud yet — push existing local data up to cloud
-          const initialPayload = JSON.stringify(localState);
-          lastSavedJsonRef.current = initialPayload;
-          fetch(endpoint, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: initialPayload,
-          })
-            .then((r) => setSyncStatus(r.ok ? 'synced' : 'error'))
-            .catch(() => setSyncStatus('error'));
-        }
-      })
-      .catch(() => {
-        if (cloudDbUrl) setSyncStatus('error');
-      })
-      .finally(() => {
-        isHydratingRef.current = false;
-      });
-  }, [userName, cloudDbUrl]);
-
-  // Save data locally and to Google Cloud / Firebase whenever state changes
+  // Save locally on every change, and to the cloud shortly after changes stop.
   useEffect(() => {
+    if (stateOwner !== userName) return;
+    latestStateRef.current = state;
+    const userKey = normalizeUserKey(userName);
+    const serialized = JSON.stringify(state);
     try {
-      const serialized = JSON.stringify(state);
-      const storageKey = getUserStorageKey(userName);
-      localStorage.setItem(storageKey, serialized);
-      localStorage.setItem(LOCAL_STORAGE_KEY, serialized);
-
-      if (isHydratingRef.current || serialized === lastSavedJsonRef.current) {
-        return;
-      }
-      lastSavedJsonRef.current = serialized;
-
-      const userKey = normalizeUserKey(userName);
-      if (cloudDbUrl && userKey) {
-        setSyncStatus('syncing');
-        fetch(`${cloudDbUrl}/users/${userKey}.json`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: serialized,
-        })
-          .then((r) => setSyncStatus(r.ok ? 'synced' : 'error'))
-          .catch(() => setSyncStatus('error'));
-      } else {
-        fetch(`/api/store?user=${encodeURIComponent(userKey || 'default')}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: serialized,
-        }).catch(() => {});
-      }
+      localStorage.setItem(getUserStorageKey(userName), serialized);
     } catch {
       // Ignore quota errors
     }
-  }, [state, userName, cloudDbUrl]);
+
+    if (serialized === lastQueuedJsonRef.current) return;
+    lastQueuedJsonRef.current = serialized;
+    if (!userKey) return;
+    setSyncPending(userKey, true);
+    // Until the cloud copy has been read, changes wait behind the pending
+    // flag and are merged in once it arrives.
+    if (isHydratingRef.current || !cloudReadOkRef.current) return;
+
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current.id);
+    saveTimerRef.current = {
+      userKey,
+      id: window.setTimeout(() => {
+        saveTimerRef.current = null;
+        pushToCloud(userKey, latestStateRef.current);
+      }, CLOUD_SAVE_DEBOUNCE_MS),
+    };
+  }, [state, stateOwner, userName, pushToCloud]);
+
+  // Don't lose the last few seconds of changes when the app is closed or
+  // backgrounded, and keep retrying when the cloud couldn't be reached.
+  useEffect(() => {
+    const retry = () => {
+      const userKey = normalizeUserKey(userName);
+      if (!userKey || isHydratingRef.current || saveTimerRef.current) return;
+      if (!cloudReadOkRef.current) {
+        if (pullsInFlightRef.current > 0) return;
+        pullFromCloud(userKey, () => currentUserKeyRef.current !== userKey);
+      } else if (isSyncPending(userKey)) {
+        pushToCloud(userKey, latestStateRef.current);
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushScheduledSave();
+      else retry();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', flushScheduledSave);
+    window.addEventListener('online', retry);
+    const retryId = window.setInterval(retry, CLOUD_RETRY_INTERVAL_MS);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', flushScheduledSave);
+      window.removeEventListener('online', retry);
+      window.clearInterval(retryId);
+    };
+  }, [userName, pushToCloud, pullFromCloud, flushScheduledSave]);
 
   const handleStartRoutine = (routine: Routine) => {
     const exMap = new Map(state.exercises.map((e) => [e.id, e]));
@@ -540,12 +665,21 @@ export const App: React.FC = () => {
   };
 
   const handleDiscardWorkout = () => {
+    if (
+      !window.confirm(
+        'Discard this workout? Everything logged in this session will be lost.'
+      )
+    ) {
+      return;
+    }
     setState((prev) => ({ ...prev, activeWorkout: null }));
     setRestTimer((prev) => ({ ...prev, isActive: false }));
     setActiveTab('routines');
   };
 
   const handleStartRestTimer = (durationSeconds: number, exerciseName: string) => {
+    // Runs inside the "set done" tap, which is what lets iPhones play the chime.
+    primeAudio();
     setRestTimer({
       isActive: true,
       targetEndTimeMs: Date.now() + durationSeconds * 1000,
@@ -572,7 +706,8 @@ export const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `yk-lifts-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const now = new Date();
+    a.download = `yk-lifts-backup-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -588,7 +723,9 @@ export const App: React.FC = () => {
     const trimmedUrl = cloudUrlInput.trim().replace(/\/+$/, '');
     try {
       localStorage.setItem(CURRENT_USER_KEY, trimmedName);
-      if (trimmedUrl) {
+      // Only remember a URL that differs from the built-in one, so changing
+      // DEFAULT_CLOUD_DB_URL in code reaches everyone.
+      if (trimmedUrl && trimmedUrl !== DEFAULT_CLOUD_DB_URL.replace(/\/+$/, '')) {
         localStorage.setItem(CLOUD_URL_KEY, trimmedUrl);
       } else {
         localStorage.removeItem(CLOUD_URL_KEY);
@@ -823,6 +960,10 @@ export const App: React.FC = () => {
             onDeleteRoutine={(id) =>
               setState((prev) => ({
                 ...prev,
+                // Remember deleted starter routines so they don't come back.
+                deletedStarterRoutineIds: isStarterRoutineId(id)
+                  ? [...new Set([...(prev.deletedStarterRoutineIds || []), id])]
+                  : prev.deletedStarterRoutineIds,
                 routines: prev.routines.filter((r) => r.id !== id),
               }))
             }

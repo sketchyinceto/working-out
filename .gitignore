@@ -27,3 +27,4 @@ data/workout-store.json
 .idea
 .vscode/*
 !.vscode/extensions.json
+lift-record-workouts.json
