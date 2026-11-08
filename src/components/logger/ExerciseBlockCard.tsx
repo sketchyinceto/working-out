@@ -18,6 +18,13 @@ interface ExerciseBlockCardProps {
   block: WorkoutExercise;
   meta: Exercise;
   insight: ExerciseInsight;
+  /** Rep range to aim for (the programme week's, or the exercise's own). */
+  targetRange: [number, number];
+  /**
+   * Show the history-based coach hint. Off during a programme, whose weekly
+   * targets would otherwise conflict with it.
+   */
+  showInsight: boolean;
   unit: WeightUnit;
   inputUnit: WeightUnit;
   onToggleInputUnit: () => void;
@@ -39,6 +46,8 @@ export const ExerciseBlockCard: React.FC<ExerciseBlockCardProps> = ({
   block,
   meta,
   insight,
+  targetRange,
+  showInsight,
   unit,
   inputUnit,
   onToggleInputUnit,
@@ -55,7 +64,7 @@ export const ExerciseBlockCard: React.FC<ExerciseBlockCardProps> = ({
 }) => {
   const { lastPerf, statDiag } = insight;
   const palette = getMusclePalette(meta.primaryMuscle);
-  const [minReps, maxReps] = meta.targetRepRange;
+  const [minReps, maxReps] = targetRange;
   const previousWorkingSets = lastPerf
     ? lastPerf.exerciseBlock.sets.filter((s) => s.type !== 'warmup')
     : [];
@@ -96,7 +105,7 @@ export const ExerciseBlockCard: React.FC<ExerciseBlockCardProps> = ({
             </span>
             <span>•</span>
             <span>{block.restSeconds}s rest</span>
-            {statDiag.hasMeaningfulInsight && (
+            {showInsight && statDiag.hasMeaningfulInsight && (
               <>
                 <span>•</span>
                 <span className={`inline-flex items-center gap-1 ${palette.textClass} font-semibold`}>

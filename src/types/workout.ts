@@ -114,6 +114,7 @@ export interface ActiveWorkoutDraft {
   notes: string;
   exercises: WorkoutExercise[];
   isMinimized: boolean;
+  programmeWeek?: ProgrammeWeekNote;
 }
 
 export interface RestTimerState {
@@ -121,6 +122,40 @@ export interface RestTimerState {
   targetEndTimeMs: number;
   totalDurationSeconds: number;
   exerciseName: string;
+}
+
+export type GoalType = 'lean_muscle' | 'muscle' | 'fat_loss' | 'recomp' | 'strength';
+export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
+
+/** Goal & schedule settings from the Trainer tab. */
+export interface TrainingProfile {
+  goal: GoalType;
+  experience: ExperienceLevel;
+  /** Days you plan to train, 0 = Monday … 6 = Sunday. */
+  trainingDays: number[];
+  /** Routines to rotate through, in order. */
+  rotationRoutineIds: string[];
+}
+
+/** The long-term programme being followed. */
+export interface ActiveProgramme {
+  templateId: string;
+  /** YYYY-MM-DD of the Monday the programme started (local time). */
+  startDate: string;
+  /** Bodyweight when it started, for the end-of-programme comparison. */
+  startBodyweightKg?: number;
+}
+
+/** Programme guidance attached to a workout started during a programme. */
+export interface ProgrammeWeekNote {
+  week: number;
+  totalWeeks: number;
+  block: string;
+  kind: 'build' | 'deload' | 'transition' | 'test';
+  repsNote: string;
+  rirNote: string;
+  compoundReps: [number, number];
+  isolationReps: [number, number];
 }
 
 export interface AppDatabaseState {
@@ -133,4 +168,6 @@ export interface AppDatabaseState {
   isDemoData: boolean;
   /** Starter routines the user deleted, so they aren't re-added on the next load. */
   deletedStarterRoutineIds?: string[];
+  trainingProfile?: TrainingProfile;
+  programme?: ActiveProgramme | null;
 }

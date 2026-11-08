@@ -14,6 +14,7 @@ import { displayToKg, formatVolume, kgToDisplay } from '../../utils/calculators'
 import { getSplitPalette } from '../../utils/splitTheme';
 import { nextSetType } from '../../utils/setTypes';
 import { pluralize } from '../../utils/text';
+import { WEEK_KIND_LABEL, isCompound } from '../../utils/coach/programme';
 import { ExerciseBlockCard, ExerciseInsight } from './ExerciseBlockCard';
 import { ExercisePickerModal } from './ExercisePickerModal';
 import { QuickStepBar } from './QuickStepBar';
@@ -295,6 +296,19 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
             </button>
           </div>
         </div>
+        {draft.programmeWeek && (
+          <div className="mt-2 pt-2 border-t border-white/[0.08] text-[11px] leading-snug">
+            <div className="font-bold text-white">
+              Week {draft.programmeWeek.week}/{draft.programmeWeek.totalWeeks} · {draft.programmeWeek.block}
+              {draft.programmeWeek.kind !== 'build' && (
+                <span className={headerPalette.textClass}> · {WEEK_KIND_LABEL[draft.programmeWeek.kind]}</span>
+              )}
+            </div>
+            <div className="text-[#8e8e93]">
+              {draft.programmeWeek.repsNote} · {draft.programmeWeek.rirNote}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3.5">
@@ -308,6 +322,14 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
               block={block}
               meta={meta}
               insight={insight}
+              targetRange={
+                draft.programmeWeek
+                  ? isCompound(meta)
+                    ? draft.programmeWeek.compoundReps
+                    : draft.programmeWeek.isolationReps
+                  : meta.targetRepRange
+              }
+              showInsight={!draft.programmeWeek}
               unit={unit}
               inputUnit={inputUnit}
               onToggleInputUnit={toggleInputUnit}

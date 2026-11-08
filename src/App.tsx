@@ -6,7 +6,7 @@ import {
   Routine,
   WorkoutSession,
 } from './types/workout';
-import type { ExercisePrescription } from './utils/trainerEngine';
+import { getProgrammeStatus } from './utils/coach/programme';
 import { useCloudSync } from './hooks/useCloudSync';
 import { AnalyticsDashboard } from './components/analytics/AnalyticsDashboard';
 import { RestTimerHUD } from './components/logger/RestTimerHUD';
@@ -104,8 +104,17 @@ export const App: React.FC = () => {
 
   // --- Workouts ---
 
-  const startDraft = (routine: Routine, prescriptions?: ExercisePrescription[]) => {
-    const draft = buildDraftFromRoutine(routine, state.exercises, state.workouts, prescriptions);
+  const startDraft = (routine: Routine) => {
+    // During a programme, this week's sets/reps/effort are applied.
+    const status = getProgrammeStatus(state.programme);
+    const draft = buildDraftFromRoutine(
+      routine,
+      state.exercises,
+      state.workouts,
+      status?.week && !status.notStarted
+        ? { week: status.week, totalWeeks: status.totalWeeks }
+        : undefined
+    );
     setState((prev) => ({ ...prev, activeWorkout: draft }));
     setActiveTab('logger');
   };
@@ -168,41 +177,30 @@ export const App: React.FC = () => {
       routines: prev.routines.map((r) => (r.id === routineId ? update(r) : r)),
     }));
 
-  const handleAddExerciseToRoutine = (routineId: string, exercise: Exercise) =>
-    updateRoutine(routineId, (r) =>
-      r.exercises.some((e) => e.exerciseId === exercise.id)
-        ? r
-        : {
-            ...r,
-            exercises: [
-              ...r.exercises,
-              {
-                id: `rt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                exerciseId: exercise.id,
-                targetSets: 3,
-                targetRepRange: [exercise.targetRepRange[0], exercise.targetRepRange[1]],
-                restSeconds: exercise.defaultRestSeconds,
-              },
-            ],
-          }
-    );
-
-  const handleSwapExerciseInRoutine = (
-    routineId: string,
+  /** Swap one exercise for another in the given routines (from stall alerts). */
+  const handleSwapExerciseInRoutines = (
     oldExerciseId: string,
-    newExercise: Exercise
+    newExercise: Exercise,
+    routineIds: string[]
   ) =>
-    updateRoutine(routineId, (r) => ({
-      ...r,
-      exercises: r.exercises.map((item) =>
-        item.exerciseId === oldExerciseId
+    setState((prev) => ({
+      ...prev,
+      routines: prev.routines.map((r) =>
+        routineIds.includes(r.id)
           ? {
-              ...item,
-              exerciseId: newExercise.id,
-              targetRepRange: [newExercise.targetRepRange[0], newExercise.targetRepRange[1]],
-              restSeconds: newExercise.defaultRestSeconds,
+              ...r,
+              exercises: r.exercises.map((item) =>
+                item.exerciseId === oldExerciseId
+                  ? {
+                      ...item,
+                      exerciseId: newExercise.id,
+                      targetRepRange: [newExercise.targetRepRange[0], newExercise.targetRepRange[1]],
+                      restSeconds: newExercise.defaultRestSeconds,
+                    }
+                  : item
+              ),
             }
-          : item
+          : r
       ),
     }));
 
@@ -340,10 +338,14 @@ export const App: React.FC = () => {
               workouts={state.workouts}
               exercises={state.exercises}
               routines={state.routines}
+              measurements={state.measurements}
               unit={state.unit}
-              onStartCoachedRoutine={startDraft}
-              onAddExerciseToRoutine={handleAddExerciseToRoutine}
-              onSwapExerciseInRoutine={handleSwapExerciseInRoutine}
+              profile={state.trainingProfile}
+              programme={state.programme}
+              onSaveProfile={(trainingProfile) => setState((prev) => ({ ...prev, trainingProfile }))}
+              onSetProgramme={(programme) => setState((prev) => ({ ...prev, programme }))}
+              onStartRoutine={startDraft}
+              onSwapExercise={handleSwapExerciseInRoutines}
               onOpenExerciseDetail={setSelectedExerciseId}
             />
           )}

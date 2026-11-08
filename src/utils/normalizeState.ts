@@ -4,6 +4,7 @@ import {
   BodyMeasurementEntry,
   Exercise,
   Routine,
+  TrainingProfile,
   WorkoutExercise,
   WorkoutSession,
 } from '../types/workout';
@@ -66,6 +67,17 @@ function normalizeActiveWorkout(raw: unknown): ActiveWorkoutDraft | null {
   };
 }
 
+function normalizeProfile(raw: unknown): TrainingProfile | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const p = raw as TrainingProfile;
+  return {
+    goal: p.goal || 'lean_muscle',
+    experience: p.experience || 'intermediate',
+    trainingDays: asArray<number>(p.trainingDays).filter((d) => d >= 0 && d <= 6),
+    rotationRoutineIds: asArray<string>(p.rotationRoutineIds),
+  };
+}
+
 export function ensureSeedExercises(existing: Exercise[]): Exercise[] {
   const existingIds = new Set(existing.map((e) => e.id));
   const missingSeeds = SEED_EXERCISES.filter((e) => !existingIds.has(e.id));
@@ -108,6 +120,8 @@ export function mergeStates(
     routines: unionById(local.routines, server.routines),
     exercises: unionById(local.exercises, server.exercises),
     activeWorkout: local.activeWorkout ?? server.activeWorkout,
+    trainingProfile: local.trainingProfile ?? server.trainingProfile,
+    programme: local.programme ?? server.programme,
     deletedStarterRoutineIds: [
       ...new Set([
         ...(local.deletedStarterRoutineIds || []),
@@ -133,5 +147,10 @@ export function normalizeState(raw: unknown): AppDatabaseState {
     activeWorkout: normalizeActiveWorkout(data.activeWorkout),
     isDemoData: !!data.isDemoData,
     deletedStarterRoutineIds,
+    trainingProfile: normalizeProfile(data.trainingProfile),
+    programme:
+      data.programme && typeof data.programme === 'object' && data.programme.templateId
+        ? data.programme
+        : null,
   };
 }
