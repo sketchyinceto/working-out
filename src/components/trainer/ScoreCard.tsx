@@ -1,5 +1,6 @@
 import React from 'react';
-import { TrainerScore } from '../../utils/coach/scoring';
+import { ScoreHistoryPoint, TrainerScore } from '../../utils/coach/scoring';
+import { ScoreTrendChart } from './ScoreTrendChart';
 
 const GRADE_STYLE: Record<TrainerScore['grade'], string> = {
   Elite: 'bg-[#a4ff00]/15 text-[#a4ff00]',
@@ -14,11 +15,12 @@ const barColor = (score: number) =>
 
 interface ScoreCardProps {
   score: TrainerScore;
+  history: ScoreHistoryPoint[];
   children?: React.ReactNode;
 }
 
 /** Overall score ring, the four parts behind it, and (as children) the review. */
-export const ScoreCard: React.FC<ScoreCardProps> = ({ score, children }) => {
+export const ScoreCard: React.FC<ScoreCardProps> = ({ score, history, children }) => {
   const radius = 34;
   const circumference = 2 * Math.PI * radius;
   const value = score.overall ?? 0;
@@ -60,6 +62,8 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ score, children }) => {
           <p className="text-xs text-[#d1d1d6] leading-snug">{score.summary}</p>
         </div>
       </div>
+
+      {score.subscores.length > 0 && <ScoreTrendChart points={history} />}
 
       {score.subscores.length > 0 && (
         <div className="space-y-2.5">

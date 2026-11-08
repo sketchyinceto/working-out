@@ -177,5 +177,6 @@ export function finalizeWorkout(
     durationMinutes,
     notes: draft.notes || undefined,
     exercises: doneBlocks,
+    ...(draft.programmeWorkoutId ? { programmeWorkoutId: draft.programmeWorkoutId } : {}),
   };
 }

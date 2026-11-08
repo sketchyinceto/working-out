@@ -60,6 +60,8 @@ export interface WorkoutSet {
 export interface WorkoutExercise {
   id: string;
   exerciseId: string;
+  /** Programme workouts: which programme slot this block fills. */
+  slotId?: string;
   supersetGroup?: 'A' | 'B' | 'C';
   notes?: string;
   restSeconds: number;
@@ -76,6 +78,8 @@ export interface WorkoutSession {
   durationMinutes: number;
   notes?: string;
   exercises: WorkoutExercise[];
+  /** Set when the session was a programme workout. */
+  programmeWorkoutId?: string;
 }
 
 export interface RoutineExerciseTemplate {
@@ -115,6 +119,7 @@ export interface ActiveWorkoutDraft {
   exercises: WorkoutExercise[];
   isMinimized: boolean;
   programmeWeek?: ProgrammeWeekNote;
+  programmeWorkoutId?: string;
 }
 
 export interface RestTimerState {
@@ -137,6 +142,24 @@ export interface TrainingProfile {
   rotationRoutineIds: string[];
 }
 
+/** What to do next time for one exercise slot, worked out after each session. */
+export interface ProgrammeTarget {
+  exerciseId: string;
+  weightKg: number;
+  reps: number;
+  /** Sets added (+) or removed (−) vs the programme's baseline for the slot. */
+  setDelta: number;
+  restSeconds?: number;
+  /** Rep range the target was set for; a new range means re-estimating. */
+  range: [number, number];
+  reason: string;
+  updatedAt: string;
+  /** Suggested replacement exercise after a stall (needs your OK). */
+  swapSuggestion?: string;
+  /** Sessions in a row where every set reached the top of the range. */
+  topStreak?: number;
+}
+
 /** The long-term programme being followed. */
 export interface ActiveProgramme {
   templateId: string;
@@ -144,6 +167,12 @@ export interface ActiveProgramme {
   startDate: string;
   /** Bodyweight when it started, for the end-of-programme comparison. */
   startBodyweightKg?: number;
+  /** Which weekly layout (3–6 days) of the programme's workouts to follow. */
+  splitId?: string;
+  /** Slot id → exercise id, for exercises you've swapped. */
+  exerciseOverrides?: Record<string, string>;
+  /** Slot id → next-session target. */
+  targets?: Record<string, ProgrammeTarget>;
 }
 
 /** Programme guidance attached to a workout started during a programme. */

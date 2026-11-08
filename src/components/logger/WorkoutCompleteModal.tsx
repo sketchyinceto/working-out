@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
-import { Award, Clock, Dumbbell, Flame, Trophy } from 'lucide-react';
+import { Award, Clock, Dumbbell, Flame, Sparkles, Trophy } from 'lucide-react';
 import { Exercise, WeightUnit, WorkoutSession } from '../../types/workout';
 import { computeStreakAndRestStats, getWorkingSets } from '../../utils/analytics';
 import { formatVolume, kgToDisplay } from '../../utils/calculators';
 import { getSplitPalette } from '../../utils/splitTheme';
+import type { SessionAnalysis } from '../../utils/coach/analysis';
 
 interface WorkoutCompleteModalProps {
   session: WorkoutSession;
@@ -11,6 +12,8 @@ interface WorkoutCompleteModalProps {
   workouts: WorkoutSession[];
   exercises: Exercise[];
   unit: WeightUnit;
+  /** Programme workouts: what changes next time, from the analysis. */
+  analysis?: SessionAnalysis | null;
   onClose: () => void;
 }
 
@@ -34,6 +37,7 @@ export const WorkoutCompleteModal: React.FC<WorkoutCompleteModalProps> = ({
   workouts,
   exercises,
   unit,
+  analysis,
   onClose,
 }) => {
   const palette = getSplitPalette(session.splitTag);
@@ -186,6 +190,21 @@ export const WorkoutCompleteModal: React.FC<WorkoutCompleteModalProps> = ({
                 +{summary.prHighlights.length - 4} more
               </div>
             )}
+          </div>
+        )}
+
+        {analysis && (analysis.items.length > 0 || analysis.message) && (
+          <div className="bg-black/40 rounded-2xl p-3 space-y-2 text-left max-h-48 overflow-y-auto">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#a4ff00] inline-flex items-center gap-1">
+              <Sparkles className="w-3 h-3" /> Next Time
+            </div>
+            {analysis.message && <p className="text-xs text-[#d1d1d6]">{analysis.message}</p>}
+            {analysis.items.map((item) => (
+              <div key={item.slotId} className="text-xs leading-snug">
+                <div className="text-white font-semibold">{item.exercise.name}</div>
+                <div className="text-[#8e8e93]">{item.summary}</div>
+              </div>
+            ))}
           </div>
         )}
 

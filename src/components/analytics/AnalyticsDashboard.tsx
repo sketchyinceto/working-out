@@ -237,18 +237,18 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           <button
             type="button"
             onClick={() => setShowExercisePicker((v) => !v)}
-            className="flex items-center gap-2 min-w-0 bg-[#2c2c2e]/85 hover:bg-[#3a3a3c] border border-white/[0.08] rounded-xl px-3 py-1.5 transition text-left group"
+            className="h-8 flex items-center gap-1.5 min-w-0 bg-[#2c2c2e]/85 hover:bg-[#3a3a3c] border border-white/[0.08] rounded-[10px] pl-1.5 pr-2.5 transition text-left group"
           >
             <div
-              className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
+              className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
               style={{ backgroundColor: `${spotlightPalette.hex}22` }}
             >
               <TrendingUp
-                className="w-3.5 h-3.5"
+                className="w-3 h-3"
                 style={{ color: spotlightPalette.hex }}
               />
             </div>
-            <span className="text-sm sm:text-base font-bold text-white truncate">
+            <span className="text-sm font-bold text-white truncate">
               {spotlightExercise.name}
             </span>
             <ChevronDown
@@ -258,7 +258,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             />
           </button>
 
-          <div className="flex items-center bg-[#2c2c2e] p-0.5 rounded-[10px] text-[11px] shrink-0">
+          <div className="h-8 flex items-stretch bg-[#2c2c2e] p-0.5 rounded-[10px] text-[11px] shrink-0">
             {[
               { label: '1M', days: 30 },
               { label: '3M', days: 90 },
@@ -269,7 +269,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 key={item.label}
                 type="button"
                 onClick={() => setDaysFilter(item.days)}
-                className={`px-2 py-1 rounded-[8px] font-semibold transition ${
+                className={`px-2 flex items-center rounded-[8px] font-semibold transition ${
                   daysFilter === item.days
                     ? 'bg-[#636366] text-white'
                     : 'text-[#8e8e93] hover:text-white'

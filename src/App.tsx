@@ -1,12 +1,23 @@
 import React, { Suspense, lazy, startTransition, useEffect, useState } from 'react';
 import { Dumbbell, Play, Sparkles } from 'lucide-react';
 import {
+  ActiveProgramme,
   Exercise,
   RestTimerState,
   Routine,
   WorkoutSession,
 } from './types/workout';
-import { getProgrammeStatus } from './utils/coach/programme';
+import { getProgrammeStatus, programmeStartDate, latestBodyweightKg } from './utils/coach/programme';
+import {
+  PROGRAMME_ROUTINE_PREFIX,
+  activeSplit,
+  buildProgrammeDraft,
+  findProgrammeWorkout,
+} from './utils/coach/programmeWorkouts';
+import { analyzeProgrammeSession, SessionAnalysis } from './utils/coach/analysis';
+import { defaultProfile } from './utils/coach/schedule';
+import { splitForDays } from './data/programmeSplits';
+import type { ProgrammeTemplate } from './data/programmes';
 import { useCloudSync } from './hooks/useCloudSync';
 import { AnalyticsDashboard } from './components/analytics/AnalyticsDashboard';
 import { RestTimerHUD } from './components/logger/RestTimerHUD';
@@ -54,6 +65,11 @@ const CustomExerciseForm = named(
   () => import('./components/exercises/CustomExerciseForm'),
   'CustomExerciseForm'
 );
+const ProgrammeWorkoutsView = named(
+  () => import('./components/routines/ProgrammeWorkoutsView'),
+  'ProgrammeWorkoutsView'
+);
+const ProgrammePicker = named(() => import('./components/trainer/ProgrammePicker'), 'ProgrammePicker');
 const WorkoutCompleteModal = named(
   () => import('./components/logger/WorkoutCompleteModal'),
   'WorkoutCompleteModal'
@@ -95,6 +111,8 @@ export const App: React.FC = () => {
     null
   );
   const [justCompleted, setJustCompleted] = useState<WorkoutSession | null>(null);
+  const [justCompletedAnalysis, setJustCompletedAnalysis] = useState<SessionAnalysis | null>(null);
+  const [showProgrammePicker, setShowProgrammePicker] = useState(false);
   const [restTimer, setRestTimer] = useState<RestTimerState>({
     isActive: false,
     targetEndTimeMs: 0,
@@ -104,17 +122,26 @@ export const App: React.FC = () => {
 
   // --- Workouts ---
 
+  const profile = state.trainingProfile ?? defaultProfile(state.routines);
+  const programmeStatus = getProgrammeStatus(state.programme);
+
+  const startProgrammeWorkout = (workoutId: string) => {
+    const programme = state.programme;
+    if (!programme || !programmeStatus?.week || programmeStatus.notStarted) return;
+    const workout = findProgrammeWorkout(activeSplit(programme, profile), workoutId);
+    if (!workout) return;
+    const draft = buildProgrammeDraft(workout, programmeStatus, programme, state.exercises, state.workouts);
+    setState((prev) => ({ ...prev, activeWorkout: draft }));
+    setActiveTab('logger');
+  };
+
+  /** Your own routines run as written; programme workouts are built by the programme. */
   const startDraft = (routine: Routine) => {
-    // During a programme, this week's sets/reps/effort are applied.
-    const status = getProgrammeStatus(state.programme);
-    const draft = buildDraftFromRoutine(
-      routine,
-      state.exercises,
-      state.workouts,
-      status?.week && !status.notStarted
-        ? { week: status.week, totalWeeks: status.totalWeeks }
-        : undefined
-    );
+    if (routine.id.startsWith(PROGRAMME_ROUTINE_PREFIX)) {
+      startProgrammeWorkout(routine.id);
+      return;
+    }
+    const draft = buildDraftFromRoutine(routine, state.exercises, state.workouts);
     setState((prev) => ({ ...prev, activeWorkout: draft }));
     setActiveTab('logger');
   };
@@ -129,15 +156,70 @@ export const App: React.FC = () => {
     if (!state.activeWorkout) return;
     const session = finalizeWorkout(state.activeWorkout, state.workouts);
     if (!session) return;
+
+    // Programme workouts: review each exercise and set next session's targets.
+    let analysis: SessionAnalysis | null = null;
+    const programme = state.programme;
+    if (session.programmeWorkoutId && programme && programmeStatus?.week) {
+      analysis = analyzeProgrammeSession(session, programme, programmeStatus.week, state.exercises, [
+        session,
+        ...state.workouts,
+      ]);
+    }
+
     setState((prev) => ({
       ...prev,
       workouts: [session, ...prev.workouts],
       activeWorkout: null,
+      ...(analysis && prev.programme
+        ? {
+            programme: {
+              ...prev.programme,
+              targets: { ...(prev.programme.targets || {}), ...analysis.targets },
+            },
+          }
+        : {}),
     }));
     setRestTimer((prev) => ({ ...prev, isActive: false }));
     setActiveTab('history');
     setJustCompleted(session);
+    setJustCompletedAnalysis(analysis);
   };
+
+  // --- Programme ---
+
+  const updateProgramme = (update: (p: ActiveProgramme) => ActiveProgramme) =>
+    setState((prev) => (prev.programme ? { ...prev, programme: update(prev.programme) } : prev));
+
+  const handleStartProgramme = (template: ProgrammeTemplate) => {
+    const bodyweight = latestBodyweightKg(state.measurements);
+    setState((prev) => ({
+      ...prev,
+      programme: {
+        templateId: template.id,
+        startDate: programmeStartDate(),
+        splitId: splitForDays(profile.trainingDays.length).id,
+        ...(bodyweight ? { startBodyweightKg: bodyweight } : {}),
+      },
+    }));
+    setShowProgrammePicker(false);
+  };
+
+  const handleAcceptSwap = (slotId: string, exerciseId: string) =>
+    updateProgramme((p) => {
+      const targets = { ...(p.targets || {}) };
+      // The new exercise starts fresh (estimated from its own history).
+      delete targets[slotId];
+      return { ...p, exerciseOverrides: { ...(p.exerciseOverrides || {}), [slotId]: exerciseId }, targets };
+    });
+
+  const handleDismissSwap = (slotId: string) =>
+    updateProgramme((p) => {
+      const current = p.targets?.[slotId];
+      if (!current) return p;
+      const { swapSuggestion: _ignored, ...rest } = current;
+      return { ...p, targets: { ...(p.targets || {}), [slotId]: rest } };
+    });
 
   const handleDiscardWorkout = () => {
     if (!window.confirm('Discard this workout? Everything logged in this session will be lost.')) {
@@ -344,6 +426,7 @@ export const App: React.FC = () => {
               programme={state.programme}
               onSaveProfile={(trainingProfile) => setState((prev) => ({ ...prev, trainingProfile }))}
               onSetProgramme={(programme) => setState((prev) => ({ ...prev, programme }))}
+              onChooseProgramme={() => setShowProgrammePicker(true)}
               onStartRoutine={startDraft}
               onSwapExercise={handleSwapExerciseInRoutines}
               onOpenExerciseDetail={setSelectedExerciseId}
@@ -363,6 +446,22 @@ export const App: React.FC = () => {
               }
               onUpdateRoutine={(updatedR: Routine) => updateRoutine(updatedR.id, () => updatedR)}
               onDeleteRoutine={handleDeleteRoutine}
+              preferProgramme={!!state.programme}
+              programmeView={
+                <ProgrammeWorkoutsView
+                  programme={state.programme}
+                  status={programmeStatus}
+                  profile={profile}
+                  exercises={state.exercises}
+                  workouts={state.workouts}
+                  unit={state.unit}
+                  onChooseProgramme={() => setShowProgrammePicker(true)}
+                  onSetSplit={(splitId) => updateProgramme((p) => ({ ...p, splitId }))}
+                  onStartWorkout={startProgrammeWorkout}
+                  onAcceptSwap={handleAcceptSwap}
+                  onDismissSwap={handleDismissSwap}
+                />
+              }
             />
           )}
 
@@ -463,9 +562,19 @@ export const App: React.FC = () => {
           />
         )}
 
+        {showProgrammePicker && (
+          <ProgrammePicker
+            goal={profile.goal}
+            currentId={programmeStatus && !programmeStatus.finished ? programmeStatus.template.id : undefined}
+            onStart={handleStartProgramme}
+            onClose={() => setShowProgrammePicker(false)}
+          />
+        )}
+
         {justCompleted && (
           <WorkoutCompleteModal
             session={justCompleted}
+            analysis={justCompletedAnalysis}
             workouts={state.workouts}
             exercises={state.exercises}
             unit={state.unit}

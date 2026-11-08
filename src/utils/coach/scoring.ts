@@ -236,3 +236,51 @@ export function computeTrainerScore(
 
   return { overall, grade, summary, subscores };
 }
+
+export interface ScoreHistoryPoint {
+  label: string;
+  consistency: number | null;
+  progression: number | null;
+  strength: number | null;
+}
+
+/**
+ * The score parts as they stood at the end of each of the last `weeks`
+ * weeks (the last point is today), using only data logged by then.
+ */
+export function computeScoreHistory(
+  workouts: WorkoutSession[],
+  exercises: Exercise[],
+  measurements: BodyMeasurementEntry[],
+  profile: TrainingProfile,
+  programme: ActiveProgramme | null | undefined,
+  weeks = 8,
+  now: Date = new Date()
+): ScoreHistoryPoint[] {
+  const points: ScoreHistoryPoint[] = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const asOf = new Date(now.getTime() - i * 7 * DAY_MS);
+    const asOfMs = asOf.getTime();
+    const pastWorkouts = workouts.filter((w) => Date.parse(w.startTime) <= asOfMs);
+    const pastMeasurements = measurements.filter((m) => m.date <= toYmd(asOf));
+    const label =
+      i === 0 ? 'Now' : asOf.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (pastWorkouts.length === 0) {
+      points.push({ label, consistency: null, progression: null, strength: null });
+      continue;
+    }
+    const score = computeTrainerScore(pastWorkouts, exercises, pastMeasurements, profile, programme, asOf);
+    const get = (key: ScoreKey) => score.subscores.find((s) => s.key === key)?.score ?? null;
+    points.push({
+      label,
+      consistency: get('consistency'),
+      progression: get('progression'),
+      strength: get('strength'),
+    });
+  }
+  return points;
+}
+
+function toYmd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}

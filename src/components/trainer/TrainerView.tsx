@@ -8,19 +8,14 @@ import {
   WeightUnit,
   WorkoutSession,
 } from '../../types/workout';
-import { ProgrammeTemplate } from '../../data/programmes';
-import { computeTrainerScore } from '../../utils/coach/scoring';
+import { computeScoreHistory, computeTrainerScore } from '../../utils/coach/scoring';
 import { findStalls, StallAlert } from '../../utils/coach/stalls';
 import { buildWeekSchedule, defaultProfile } from '../../utils/coach/schedule';
-import {
-  getProgrammeStatus,
-  latestBodyweightKg,
-  programmeStartDate,
-} from '../../utils/coach/programme';
+import { getProgrammeStatus, latestBodyweightKg } from '../../utils/coach/programme';
+import { activeSplit, programmeWorkoutsAsRoutines } from '../../utils/coach/programmeWorkouts';
 import { ScoreCard } from './ScoreCard';
 import { ProgressReview } from './ProgressReview';
 import { ProgrammeCard } from './ProgrammeCard';
-import { ProgrammePicker } from './ProgrammePicker';
 import { WeekSchedule } from './WeekSchedule';
 import { StallAlerts } from './StallAlerts';
 import { GoalSettings } from './GoalSettings';
@@ -35,6 +30,7 @@ interface TrainerViewProps {
   programme?: ActiveProgramme | null;
   onSaveProfile: (profile: TrainingProfile) => void;
   onSetProgramme: (programme: ActiveProgramme | null) => void;
+  onChooseProgramme: () => void;
   onStartRoutine: (routine: Routine) => void;
   onSwapExercise: (oldExerciseId: string, replacement: Exercise, routineIds: string[]) => void;
   onOpenExerciseDetail: (exerciseId: string) => void;
@@ -50,11 +46,11 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
   programme,
   onSaveProfile,
   onSetProgramme,
+  onChooseProgramme,
   onStartRoutine,
   onSwapExercise,
   onOpenExerciseDetail,
 }) => {
-  const [showPicker, setShowPicker] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   const profile = useMemo(
@@ -68,29 +64,32 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
     () => computeTrainerScore(workouts, exercises, measurements, profile, programme),
     [workouts, exercises, measurements, profile, programme]
   );
+  const history = useMemo(
+    () => computeScoreHistory(workouts, exercises, measurements, profile, programme),
+    [workouts, exercises, measurements, profile, programme]
+  );
   const stalls = useMemo(
     () => findStalls(workouts, exercises, routines, programme),
     [workouts, exercises, routines, programme]
   );
-  const week = useMemo(
-    () => buildWeekSchedule(profile, routines, workouts),
-    [profile, routines, workouts]
-  );
-
-  const startProgramme = (template: ProgrammeTemplate) => {
-    onSetProgramme({
-      templateId: template.id,
-      startDate: programmeStartDate(),
-      ...(bodyweightKg ? { startBodyweightKg: bodyweightKg } : {}),
-    });
-    setShowPicker(false);
-  };
+  // While following a programme, the week rotates through its workouts.
+  const week = useMemo(() => {
+    if (programme && status && !status.finished) {
+      const programmeRoutines = programmeWorkoutsAsRoutines(activeSplit(programme, profile), programme);
+      return buildWeekSchedule(
+        { ...profile, rotationRoutineIds: programmeRoutines.map((r) => r.id) },
+        programmeRoutines,
+        workouts
+      );
+    }
+    return buildWeekSchedule(profile, routines, workouts);
+  }, [profile, routines, workouts, programme, status]);
 
   return (
     <div className="space-y-4 pb-6">
       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white px-0.5">Trainer</h1>
 
-      <ScoreCard score={score}>
+      <ScoreCard score={score} history={history}>
         {workouts.length > 0 && (
           <ProgressReview
             workouts={workouts}
@@ -105,7 +104,7 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
       <ProgrammeCard
         status={status}
         bodyweightKg={bodyweightKg}
-        onChoose={() => setShowPicker(true)}
+        onChoose={onChooseProgramme}
         onEnd={() => onSetProgramme(null)}
       />
 
@@ -125,15 +124,6 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
         }
         onOpenExerciseDetail={onOpenExerciseDetail}
       />
-
-      {showPicker && (
-        <ProgrammePicker
-          goal={profile.goal}
-          currentId={status && !status.finished ? status.template.id : undefined}
-          onStart={startProgramme}
-          onClose={() => setShowPicker(false)}
-        />
-      )}
 
       {showSettings && (
         <GoalSettings

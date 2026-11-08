@@ -16,6 +16,10 @@ interface RoutinesViewProps {
   onCreateRoutine: (routine: Routine) => void;
   onUpdateRoutine: (routine: Routine) => void;
   onDeleteRoutine: (routineId: string) => void;
+  /** The Programme tab's content. */
+  programmeView: React.ReactNode;
+  /** Open on the Programme tab (e.g. while following a programme). */
+  preferProgramme: boolean;
 }
 
 export const RoutinesView: React.FC<RoutinesViewProps> = ({
@@ -27,7 +31,26 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
   onCreateRoutine,
   onUpdateRoutine,
   onDeleteRoutine,
+  programmeView,
+  preferProgramme,
 }) => {
+  const [mode, setMode] = useState<'routines' | 'programme'>(() => {
+    try {
+      const saved = localStorage.getItem('yk_lifts_routines_tab');
+      if (saved === 'routines' || saved === 'programme') return saved;
+    } catch {
+      // Ignore
+    }
+    return preferProgramme ? 'programme' : 'routines';
+  });
+  const switchMode = (next: 'routines' | 'programme') => {
+    setMode(next);
+    try {
+      localStorage.setItem('yk_lifts_routines_tab', next);
+    } catch {
+      // Ignore
+    }
+  };
   // null = closed; { routine: undefined } = creating; { routine } = editing.
   const [editor, setEditor] = useState<{ routine?: Routine } | null>(null);
 
@@ -46,6 +69,40 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
   const recommendedSplit: 'Push' | 'Pull' | 'Legs' =
     lastSplit === 'Push' ? 'Pull' : lastSplit === 'Pull' ? 'Legs' : 'Push';
   const recommendedPalette = getSplitPalette(recommendedSplit);
+
+  const modeSwitch = (
+    <div className="grid grid-cols-2 bg-[#1c1c1e] p-1 rounded-[12px] text-xs" role="tablist">
+      {(
+        [
+          ['routines', 'My Routines'],
+          ['programme', 'Programme'],
+        ] as const
+      ).map(([key, label]) => (
+        <button
+          key={key}
+          type="button"
+          role="tab"
+          aria-selected={mode === key}
+          onClick={() => switchMode(key)}
+          className={`py-2 rounded-[9px] font-bold transition ${
+            mode === key ? 'bg-[#3a3a3c] text-white' : 'text-[#8e8e93] hover:text-white'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (mode === 'programme') {
+    return (
+      <div className="space-y-4 pb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white px-0.5">Routines</h1>
+        {modeSwitch}
+        {programmeView}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 pb-6">
@@ -66,6 +123,8 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
           <Dumbbell className="w-3.5 h-3.5" /> Quick Start
         </button>
       </div>
+
+      {modeSwitch}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
         {routines.map((routine) => {

@@ -52,7 +52,8 @@ export const ProgressReview: React.FC<ProgressReviewProps> = ({
     { label: 'Sessions', now: review.totals.sessions, before: review.previous?.sessions ?? null, text: String(review.totals.sessions) },
     { label: 'Sets', now: review.totals.sets, before: review.previous?.sets ?? null, text: String(review.totals.sets) },
     {
-      label: `Volume ${unit}`,
+      label: 'Volume',
+      suffix: unit,
       now: review.totals.volumeKg,
       before: review.previous?.volumeKg ?? null,
       // Unit is in the label so the number fits the tile.
@@ -98,7 +99,10 @@ export const ProgressReview: React.FC<ProgressReviewProps> = ({
         {stats.map((s) => (
           <div key={s.label} className="bg-black/40 rounded-xl px-2 py-2">
             <div className="text-[9px] uppercase tracking-wider text-[#8e8e93] font-semibold">{s.label}</div>
-            <div className="text-sm font-bold font-mono-num text-white truncate">{s.text}</div>
+            <div className="text-sm font-bold font-mono-num text-white truncate">
+              {s.text}
+              {'suffix' in s && <span className="text-[9px] font-semibold text-[#8e8e93] ml-0.5">{s.suffix}</span>}
+            </div>
             <Delta now={s.now} before={s.before} format={s.format} />
           </div>
         ))}
