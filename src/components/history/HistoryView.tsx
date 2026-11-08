@@ -20,6 +20,9 @@ interface HistoryViewProps {
   onExportJson?: () => void;
 }
 
+// Drawing every card at once gets slow after months of training.
+const PAGE_SIZE = 20;
+
 const SPLIT_FILTERS = ['All', 'Push', 'Pull', 'Legs', 'Upper', 'Lower', 'Full Body', 'Custom'] as const;
 type SplitFilter = (typeof SPLIT_FILTERS)[number];
 
@@ -47,6 +50,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   const [selectedDateStr, setSelectedDateStr] = useState<string | null>(null);
   const [expandedSets, setExpandedSets] = useState<Record<string, boolean>>({});
   const [editingWorkout, setEditingWorkout] = useState<WorkoutSession | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const exerciseMap = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises]);
 
@@ -116,7 +120,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                 <button
                   key={tag}
                   type="button"
-                  onClick={() => setSplitFilter(tag)}
+                  onClick={() => {
+                    setSplitFilter(tag);
+                    setVisibleCount(PAGE_SIZE);
+                  }}
                   className={`px-2.5 py-1 rounded-[8px] font-semibold whitespace-nowrap transition ${
                     splitFilter === tag ? activeClass : 'text-[#8e8e93] hover:text-white'
                   }`}
@@ -143,7 +150,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredWorkouts.map((session, idx) => {
+          {filteredWorkouts.slice(0, visibleCount).map((session, idx) => {
             const above = idx > 0 ? filteredWorkouts[idx - 1] : null;
             const restDays =
               above && !selectedDateStr
@@ -177,6 +184,15 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
               </React.Fragment>
             );
           })}
+          {filteredWorkouts.length > visibleCount && (
+            <button
+              type="button"
+              onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+              className="w-full py-3 rounded-[18px] bg-[#1c1c1e] hover:bg-[#2c2c2e] border border-white/[0.06] text-[#a4ff00] font-bold text-xs transition"
+            >
+              Show Older Workouts ({filteredWorkouts.length - visibleCount} more)
+            </button>
+          )}
         </div>
       )}
 

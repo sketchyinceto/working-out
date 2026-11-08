@@ -13,6 +13,8 @@ import {
   formatShortDate,
   getExerciseProgressionSeries,
   getWorkingSets,
+  getExerciseProgressionSeriesBefore,
+  workoutsNewestFirst,
 } from './analytics';
 import { kgToDisplay } from './calculators';
 import { pluralize } from './text';
@@ -194,9 +196,7 @@ function computeRecentSetDropoffStats(
   latestLastReps: number;
   allLatestSetsClearedReps: (minTarget: number) => boolean;
 } {
-  const sortedNewest = [...workouts].sort(
-    (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-  );
+  const sortedNewest = workoutsNewestFirst(workouts);
 
   const sessionWorkingSets: { weightKg: number; reps: number }[][] = [];
   for (const w of sortedNewest) {
@@ -523,9 +523,7 @@ export function generateTrainerEvaluation(
   const tonnageTrends = computeWeeklyTonnageTrends(workouts, exercises, 4);
 
   // 1. Determine Recommended Next Split & Routine
-  const sortedNewest = [...workouts].sort(
-    (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-  );
+  const sortedNewest = workoutsNewestFirst(workouts);
   const lastSession = sortedNewest[0];
   const recommendedSplit: 'Push' | 'Pull' | 'Legs' =
     lastSession?.splitTag === 'Push'
@@ -815,7 +813,7 @@ export function generateTrainerEvaluation(
     }
     let histProgCount = 0;
     for (const exId of recentExIds) {
-      const s = getExerciseProgressionSeries(exId, workoutsUpToEnd, null);
+      const s = getExerciseProgressionSeriesBefore(exId, workouts, end.getTime());
       if (s.length >= 2) {
         const lastPt = s[s.length - 1];
         const prevPt = s[s.length - 2];
@@ -873,7 +871,7 @@ export function generateTrainerEvaluation(
     // 4. Historical Strength Score up to `end`
     const histRatios: number[] = [];
     for (const bm of strengthBenchmarks) {
-      const s = getExerciseProgressionSeries(bm.id, workoutsUpToEnd, null);
+      const s = getExerciseProgressionSeriesBefore(bm.id, workouts, end.getTime());
       if (s.length > 0) {
         const max1RM = Math.max(...s.map((pt) => pt.bestE1RMKg));
         histRatios.push(

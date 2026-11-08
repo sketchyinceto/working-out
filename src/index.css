@@ -116,39 +116,45 @@ input[type="number"] {
 /*
  * iPhone safe areas. When the app is opened from the home screen it draws
  * under the status bar (clock, battery) and the home bar, so anything pinned
- * to the top or bottom edge needs that space added.
+ * to the top or bottom edge needs that space added. The system margins
+ * include some empty padding, so the bars tuck slightly into them, the way
+ * iOS's own navigation and tab bars do.
  */
 :root {
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --header-pad: max(calc(var(--safe-top) - 8px), 0px);
+  --nav-pad: max(calc(var(--safe-bottom) - 16px), 0px);
+  --header-h: 2.75rem; /* h-11 in AppHeader */
+  --nav-h: 3.25rem; /* h-13 in BottomNav */
 }
 
 .safe-header {
-  padding-top: var(--safe-top);
+  padding-top: var(--header-pad);
 }
 
 .safe-nav {
-  padding-bottom: var(--safe-bottom);
+  padding-bottom: var(--nav-pad);
 }
 
-/* Room for the bottom tab bar (3.75rem) plus breathing space. */
+/* Room for the bottom tab bar plus breathing space. */
 .safe-main {
-  padding-bottom: calc(6rem + var(--safe-bottom));
+  padding-bottom: calc(var(--nav-h) + var(--nav-pad) + 2.5rem);
 }
 
 /* Floating bars that sit just above the bottom tab bar. */
 .safe-above-nav {
-  bottom: calc(4.25rem + var(--safe-bottom));
+  bottom: calc(var(--nav-h) + var(--nav-pad) + 0.5rem);
 }
 
-/* Sticky elements that sit just below the top header (3.25rem). */
+/* Sticky elements that sit just below the top header. */
 .safe-below-header {
-  top: calc(3.75rem + var(--safe-top));
+  top: calc(var(--header-h) + var(--header-pad) + 0.5rem);
 }
 
 /* Bottom sheets on phones: keep buttons clear of the home bar. */
 .safe-sheet {
-  padding-bottom: calc(1rem + var(--safe-bottom));
+  padding-bottom: calc(1rem + var(--nav-pad));
 }
 @media (min-width: 640px) {
   .safe-sheet {

@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState } from 'react';
+import React, { Suspense, lazy, startTransition, useEffect, useState } from 'react';
 import { Dumbbell, Play, Sparkles } from 'lucide-react';
 import {
   Exercise,
@@ -24,7 +24,11 @@ import {
 
 // Summary is the start screen, so it ships in the main bundle. Everything else
 // downloads the first time it's opened, which keeps the first load small.
+// Every lazily loaded screen, so they can all be fetched in the background.
+const screenLoaders: (() => Promise<unknown>)[] = [];
+
 function named<M, K extends keyof M>(load: () => Promise<M>, key: K) {
+  screenLoaders.push(load);
   return lazy(async () => ({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     default: (await load())[key] as Extract<M[K], React.ComponentType<any>>,
@@ -64,7 +68,27 @@ const ScreenLoading = () => (
 export const App: React.FC = () => {
   const { userName, state, setState, syncStatus, switchProfile } = useCloudSync();
   const [showProfileModal, setShowProfileModal] = useState(() => !userName);
-  const [activeTab, setActiveTab] = useState<NavTab>('analytics');
+  const [activeTab, setActiveTabNow] = useState<NavTab>('analytics');
+  // Switching tabs as a transition keeps the current screen on show until
+  // the next one is ready, instead of flashing a loading spinner.
+  const setActiveTab = (tab: NavTab) => startTransition(() => setActiveTabNow(tab));
+
+  // Once the app has started, quietly download the other screens so opening
+  // them later is instant (each is fetched once and then cached).
+  useEffect(() => {
+    const prefetch = () => {
+      for (const load of screenLoaders) load().catch(() => {});
+    };
+    const idle = (window as { requestIdleCallback?: (cb: () => void) => number })
+      .requestIdleCallback;
+    if (idle) {
+      const id = idle(prefetch);
+      return () =>
+        (window as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(id);
+    }
+    const id = window.setTimeout(prefetch, 1200);
+    return () => window.clearTimeout(id);
+  }, []);
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
   // null = closed; { exercise: null } = creating; { exercise } = editing.
   const [exerciseForm, setExerciseForm] = useState<{ exercise: Exercise | null } | null>(

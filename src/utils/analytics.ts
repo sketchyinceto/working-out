@@ -36,9 +36,44 @@ export function getWorkingSets(sets: WorkoutSet[]): WorkoutSet[] {
   return sets.filter((s) => s.completed && s.type !== 'warmup' && s.reps > 0);
 }
 
+// Building a date formatter is slow; toLocaleDateString builds one per call.
+const SHORT_DATE = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+
 export function formatShortDate(isoDate: string): string {
-  const d = new Date(isoDate);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return SHORT_DATE.format(new Date(isoDate));
+}
+
+// --- Caches ---------------------------------------------------------------
+// The workout list only changes when you log or edit something, and React
+// keeps the same array object until then. Keying caches on that array means
+// each screen re-uses work instead of re-sorting the whole history (and
+// re-parsing every date) hundreds of times per render.
+
+const oldestFirstCache = new WeakMap<WorkoutSession[], WorkoutSession[]>();
+const newestFirstCache = new WeakMap<WorkoutSession[], WorkoutSession[]>();
+const seriesCache = new WeakMap<WorkoutSession[], Map<string, ExerciseSessionDataPoint[]>>();
+
+/** Workouts sorted oldest → newest (cached; don't mutate the result). */
+export function workoutsOldestFirst(workouts: WorkoutSession[]): WorkoutSession[] {
+  let sorted = oldestFirstCache.get(workouts);
+  if (!sorted) {
+    sorted = workouts
+      .map((w) => ({ w, t: Date.parse(w.startTime) }))
+      .sort((a, b) => a.t - b.t)
+      .map((x) => x.w);
+    oldestFirstCache.set(workouts, sorted);
+  }
+  return sorted;
+}
+
+/** Workouts sorted newest → oldest (cached; don't mutate the result). */
+export function workoutsNewestFirst(workouts: WorkoutSession[]): WorkoutSession[] {
+  let sorted = newestFirstCache.get(workouts);
+  if (!sorted) {
+    sorted = [...workoutsOldestFirst(workouts)].reverse();
+    newestFirstCache.set(workouts, sorted);
+  }
+  return sorted;
 }
 
 export function getExerciseProgressionSeries(
@@ -46,12 +81,35 @@ export function getExerciseProgressionSeries(
   workouts: WorkoutSession[],
   daysFilter: number | null = null
 ): ExerciseSessionDataPoint[] {
-  const cutoffMs = daysFilter ? Date.now() - daysFilter * 24 * 60 * 60 * 1000 : 0;
+  const full = getFullSeries(exerciseId, workouts);
+  if (!daysFilter) return full.slice();
+  const cutoffMs = Date.now() - daysFilter * 24 * 60 * 60 * 1000;
+  return full.filter((p) => Date.parse(p.date) >= cutoffMs);
+}
 
-  // Sort workouts chronologically (oldest -> newest) to track PRs accurately
-  const chronological = [...workouts].sort(
-    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-  );
+/**
+ * The exercise's series up to (not including) a moment in time. Same result
+ * as computing it from only the workouts before then, but reuses the cache.
+ */
+export function getExerciseProgressionSeriesBefore(
+  exerciseId: string,
+  workouts: WorkoutSession[],
+  beforeMs: number
+): ExerciseSessionDataPoint[] {
+  return getFullSeries(exerciseId, workouts).filter((p) => Date.parse(p.date) < beforeMs);
+}
+
+function getFullSeries(exerciseId: string, workouts: WorkoutSession[]): ExerciseSessionDataPoint[] {
+  let byExercise = seriesCache.get(workouts);
+  if (!byExercise) {
+    byExercise = new Map();
+    seriesCache.set(workouts, byExercise);
+  }
+  const cached = byExercise.get(exerciseId);
+  if (cached) return cached;
+
+  // Oldest -> newest so PRs are judged against earlier sessions only.
+  const chronological = workoutsOldestFirst(workouts);
 
   let runningMaxE1RM = 0;
   let runningMaxWeight = 0;
@@ -112,19 +170,15 @@ export function getExerciseProgressionSeries(
     });
   }
 
-  if (!daysFilter) return allPoints;
-  return allPoints.filter((p) => new Date(p.date).getTime() >= cutoffMs);
+  byExercise.set(exerciseId, allPoints);
+  return allPoints;
 }
 
 export function getLastPerformedExerciseBlock(
   exerciseId: string,
   workouts: WorkoutSession[]
 ): { sessionDate: string; exerciseBlock: WorkoutExercise } | null {
-  const sortedNewestFirst = [...workouts].sort(
-    (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-  );
-
-  for (const w of sortedNewestFirst) {
+  for (const w of workoutsNewestFirst(workouts)) {
     const found = w.exercises.find(
       (e) => e.exerciseId === exerciseId && getWorkingSets(e.sets).length > 0
     );

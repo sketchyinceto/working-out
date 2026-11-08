@@ -23,7 +23,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const dot = SYNC_DOT[syncStatus];
   return (
     <header className="safe-header sticky top-0 z-40 bg-black/80 backdrop-blur-2xl border-b border-white/[0.08]">
-      <div className="max-w-3xl mx-auto px-4 h-13 flex items-center justify-between gap-2">
+      <div className="max-w-3xl mx-auto px-4 h-11 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-full bg-[#a4ff00]/15 text-[#a4ff00] flex items-center justify-center shrink-0">
             <Dumbbell className="w-4 h-4 stroke-[2.5]" />

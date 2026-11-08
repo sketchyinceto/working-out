@@ -18,7 +18,7 @@ interface BottomNavProps {
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelect }) => (
   <nav className="safe-nav fixed bottom-0 inset-x-0 z-40 bg-[#121214]/90 backdrop-blur-2xl border-t border-white/[0.08]">
-    <div className="max-w-md mx-auto grid grid-cols-5 h-15 px-1.5">
+    <div className="max-w-md mx-auto grid grid-cols-5 h-13 px-1.5">
       {TABS.map(({ tab, label, icon: Icon }) => {
         // The workout logger lives under the Routines tab.
         const isActive = activeTab === tab || (tab === 'routines' && activeTab === 'logger');
