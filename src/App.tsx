@@ -51,7 +51,7 @@ const CURRENT_USER_KEY = 'yk_lifts_current_user';
 const CLOUD_URL_KEY = 'yk_lifts_cloud_db_url';
 
 // Paste your Google Cloud / Firebase Realtime Database URL here (e.g. "https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app")
-const DEFAULT_CLOUD_DB_URL = '';
+const DEFAULT_CLOUD_DB_URL = 'https://yk-lifts-6416e-default-rtdb.asia-southeast1.firebasedatabase.app';
 
 function normalizeUserKey(name: string): string {
   return name
@@ -120,10 +120,8 @@ export const App: React.FC = () => {
   });
   const [cloudDbUrl, setCloudDbUrl] = useState<string>(() => {
     try {
-      return (
-        localStorage.getItem(CLOUD_URL_KEY) ||
-        DEFAULT_CLOUD_DB_URL
-      ).replace(/\/+$/, '');
+      const stored = localStorage.getItem(CLOUD_URL_KEY)?.trim();
+      return (stored || DEFAULT_CLOUD_DB_URL).replace(/\/+$/, '');
     } catch {
       return DEFAULT_CLOUD_DB_URL.replace(/\/+$/, '');
     }
