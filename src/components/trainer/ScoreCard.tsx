@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScoreHistoryPoint, TrainerScore } from '../../utils/coach/scoring';
+import { SCORE_COLORS, ScoreHistoryPoint, TrainerScore } from '../../utils/coach/scoring';
 import { ScoreTrendChart } from './ScoreTrendChart';
 
 const GRADE_STYLE: Record<TrainerScore['grade'], string> = {
@@ -10,8 +10,6 @@ const GRADE_STYLE: Record<TrainerScore['grade'], string> = {
   'Getting Started': 'bg-[#2c2c2e] text-[#8e8e93]',
 };
 
-const barColor = (score: number) =>
-  score >= 85 ? 'bg-[#a4ff00]' : score >= 70 ? 'bg-[#00f5ea]' : score >= 50 ? 'bg-[#ffe620]' : 'bg-[#fa114f]';
 
 interface ScoreCardProps {
   score: TrainerScore;
@@ -19,7 +17,7 @@ interface ScoreCardProps {
   children?: React.ReactNode;
 }
 
-/** Overall score ring, the four parts behind it, and (as children) the review. */
+/** Overall score ring, the three parts behind it, and (as children) the review. */
 export const ScoreCard: React.FC<ScoreCardProps> = ({ score, history, children }) => {
   const radius = 34;
   const circumference = 2 * Math.PI * radius;
@@ -70,7 +68,8 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ score, history, children }
           {score.subscores.map((s) => (
             <div key={s.key}>
               <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-white inline-flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: SCORE_COLORS[s.key] }} />
                   {s.label}
                   <span className="text-[#636366] font-normal"> · {Math.round(s.weight * 100)}%</span>
                 </span>
@@ -78,7 +77,10 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ score, history, children }
               </div>
               <div className="h-1.5 rounded-full bg-[#2c2c2e] overflow-hidden mt-1">
                 {s.score !== null && (
-                  <div className={`h-full rounded-full ${barColor(s.score)}`} style={{ width: `${s.score}%` }} />
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${s.score}%`, backgroundColor: SCORE_COLORS[s.key] }}
+                  />
                 )}
               </div>
               <p className="text-[11px] text-[#8e8e93] mt-1 leading-snug">{s.detail}</p>

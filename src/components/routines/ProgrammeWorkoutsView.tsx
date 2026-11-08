@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CalendarRange, Play, RefreshCw, Sparkles, X } from 'lucide-react';
+import { CalendarRange, Play, RefreshCw, Settings2, Sparkles, X } from 'lucide-react';
 import {
   ActiveProgramme,
   Exercise,
@@ -7,7 +7,8 @@ import {
   WeightUnit,
   WorkoutSession,
 } from '../../types/workout';
-import { PROGRAMME_SPLITS } from '../../data/programmeSplits';
+import { GOAL_LABELS, ProgrammeTemplate, programmeForGoal } from '../../data/programmes';
+import { WeekPicker } from '../trainer/WeekPicker';
 import { ProgrammeStatus, WEEK_KIND_LABEL, describeRir } from '../../utils/coach/programme';
 import {
   PROGRAMME_ROUTINE_PREFIX,
@@ -26,7 +27,9 @@ interface ProgrammeWorkoutsViewProps {
   workouts: WorkoutSession[];
   unit: WeightUnit;
   onChooseProgramme: () => void;
-  onSetSplit: (splitId: string) => void;
+  onStartProgramme: (template: ProgrammeTemplate) => void;
+  onEditSettings: () => void;
+  onSetWeek: (week: number) => void;
   onStartWorkout: (workoutId: string) => void;
   onAcceptSwap: (slotId: string, exerciseId: string) => void;
   onDismissSwap: (slotId: string) => void;
@@ -40,7 +43,9 @@ export const ProgrammeWorkoutsView: React.FC<ProgrammeWorkoutsViewProps> = ({
   workouts,
   unit,
   onChooseProgramme,
-  onSetSplit,
+  onStartProgramme,
+  onEditSettings,
+  onSetWeek,
   onStartWorkout,
   onAcceptSwap,
   onDismissSwap,
@@ -60,21 +65,32 @@ export const ProgrammeWorkoutsView: React.FC<ProgrammeWorkoutsViewProps> = ({
   }, [split, workouts]);
 
   if (!programme || !status || !split) {
+    const designed = programmeForGoal(profile.goal);
+    const days = profile.trainingDays.length;
     return (
-      <div className="af-card p-5 text-center space-y-3">
-        <CalendarRange className="w-7 h-7 text-[#a4ff00] mx-auto" />
-        <h2 className="text-base font-bold text-white">No programme yet</h2>
+      <div className="af-card p-5 space-y-3">
+        <CalendarRange className="w-7 h-7 text-[#a4ff00]" />
+        <h2 className="text-base font-bold text-white">Your programme</h2>
         <p className="text-xs text-[#d1d1d6]">
-          Pick a programme and its workouts appear here. After each session the app reviews how
-          every exercise went and sets the weight, reps and sets for next time.
+          Built from your Goal & Schedule: <strong className="text-white">{designed.name}</strong>,{' '}
+          {days} training day{days === 1 ? '' : 's'} a week, {profile.experience} volume. After each
+          session the app reviews every exercise and sets the weight, reps and sets for next time.
         </p>
         <button
           type="button"
-          onClick={onChooseProgramme}
+          onClick={() => onStartProgramme(designed)}
           className="w-full py-2.5 rounded-full bg-[#a4ff00] text-black font-bold text-xs"
         >
-          Choose a Programme
+          Start {designed.name}
         </button>
+        <div className="flex gap-2">
+          <button type="button" onClick={onEditSettings} className="flex-1 py-2 rounded-full bg-[#2c2c2e] text-white text-xs font-semibold">
+            Edit Goal & Schedule
+          </button>
+          <button type="button" onClick={onChooseProgramme} className="flex-1 py-2 rounded-full bg-[#2c2c2e] text-white text-xs font-semibold">
+            Other Programmes
+          </button>
+        </div>
       </div>
     );
   }
@@ -97,8 +113,15 @@ export const ProgrammeWorkoutsView: React.FC<ProgrammeWorkoutsViewProps> = ({
       <div className="af-card p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#a4ff00]">
-              {status.notStarted ? 'Starts next Monday · week 1 preview' : `Week ${status.weekNumber} of ${status.totalWeeks} · ${WEEK_KIND_LABEL[week.kind]}`}
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#a4ff00] flex items-center gap-1.5 flex-wrap">
+              {status.notStarted ? (
+                'Starts next Monday · week 1 preview'
+              ) : (
+                <>
+                  <WeekPicker template={status.template} weekNumber={status.weekNumber} color="#a4ff00" onSetWeek={onSetWeek} />
+                  <span>· {WEEK_KIND_LABEL[week.kind]}</span>
+                </>
+              )}
             </div>
             <h2 className="text-base font-bold text-white leading-tight">{week.block}</h2>
             <p className="text-[11px] text-[#8e8e93] truncate">{status.template.name}</p>
@@ -111,31 +134,30 @@ export const ProgrammeWorkoutsView: React.FC<ProgrammeWorkoutsViewProps> = ({
           Compounds {week.compoundReps[0]}–{week.compoundReps[1]} reps · isolation {week.isolationReps[0]}–{week.isolationReps[1]} · {describeRir(week.rir)}
         </p>
 
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-wider text-[#8e8e93] mb-1.5">Days per week</div>
-          <div className="grid grid-cols-4 gap-1.5">
-            {PROGRAMME_SPLITS.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                aria-pressed={s.id === split.id}
-                onClick={() => onSetSplit(s.id)}
-                className={`py-1.5 rounded-xl text-xs font-bold transition ${
-                  s.id === split.id ? 'bg-[#a4ff00] text-black' : 'bg-[#2c2c2e] text-[#8e8e93] hover:text-white'
-                }`}
-              >
-                {s.daysPerWeek} days
-              </button>
-            ))}
+        <div className="bg-black/35 rounded-xl px-3 py-2.5 flex items-start justify-between gap-2">
+          <div className="text-[11px] leading-snug min-w-0">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#8e8e93] mb-0.5">
+              Designed from your Goal & Schedule
+            </div>
+            <div className="text-white">
+              {GOAL_LABELS[profile.goal]} · {profile.trainingDays.length} days · {profile.experience}
+            </div>
+            <div className="text-[#8e8e93]">
+              {split.name}: {split.description}
+            </div>
           </div>
-          <p className="text-[11px] text-[#8e8e93] mt-1.5">
-            {split.name}: {split.description}
-          </p>
+          <button
+            type="button"
+            onClick={onEditSettings}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-[#2c2c2e] text-[11px] font-semibold text-white shrink-0"
+          >
+            <Settings2 className="w-3.5 h-3.5" /> Edit
+          </button>
         </div>
       </div>
 
       {split.workouts.map((w) => {
-        const plan = planProgrammeWorkout(w, programme, week, exercises, workouts);
+        const plan = planProgrammeWorkout(w, programme, week, exercises, workouts, profile.experience);
         const palette = getSplitPalette(w.splitTag);
         const isNext = w.id === nextWorkoutId;
         const isOpen = openId === w.id || isNext;

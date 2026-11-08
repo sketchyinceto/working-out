@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   ActiveProgramme,
   BodyMeasurementEntry,
@@ -18,7 +18,6 @@ import { ProgressReview } from './ProgressReview';
 import { ProgrammeCard } from './ProgrammeCard';
 import { WeekSchedule } from './WeekSchedule';
 import { StallAlerts } from './StallAlerts';
-import { GoalSettings } from './GoalSettings';
 
 interface TrainerViewProps {
   workouts: WorkoutSession[];
@@ -28,9 +27,10 @@ interface TrainerViewProps {
   unit: WeightUnit;
   profile?: TrainingProfile;
   programme?: ActiveProgramme | null;
-  onSaveProfile: (profile: TrainingProfile) => void;
   onSetProgramme: (programme: ActiveProgramme | null) => void;
   onChooseProgramme: () => void;
+  onEditSettings: () => void;
+  onSetWeek: (week: number) => void;
   onStartRoutine: (routine: Routine) => void;
   onSwapExercise: (oldExerciseId: string, replacement: Exercise, routineIds: string[]) => void;
   onOpenExerciseDetail: (exerciseId: string) => void;
@@ -44,14 +44,14 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
   unit,
   profile: savedProfile,
   programme,
-  onSaveProfile,
   onSetProgramme,
   onChooseProgramme,
+  onEditSettings,
+  onSetWeek,
   onStartRoutine,
   onSwapExercise,
   onOpenExerciseDetail,
 }) => {
-  const [showSettings, setShowSettings] = useState(false);
 
   const profile = useMemo(
     () => savedProfile ?? defaultProfile(routines),
@@ -106,6 +106,7 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
         bodyweightKg={bodyweightKg}
         onChoose={onChooseProgramme}
         onEnd={() => onSetProgramme(null)}
+        onSetWeek={onSetWeek}
       />
 
       <WeekSchedule
@@ -113,7 +114,7 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
         profile={profile}
         isCustomised={!!savedProfile}
         onStartRoutine={onStartRoutine}
-        onEditSettings={() => setShowSettings(true)}
+        onEditSettings={onEditSettings}
       />
 
       <StallAlerts
@@ -125,17 +126,6 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
         onOpenExerciseDetail={onOpenExerciseDetail}
       />
 
-      {showSettings && (
-        <GoalSettings
-          profile={profile}
-          routines={routines}
-          onSave={(p) => {
-            onSaveProfile(p);
-            setShowSettings(false);
-          }}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
     </div>
   );
 };

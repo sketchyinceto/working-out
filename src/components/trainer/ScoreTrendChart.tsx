@@ -1,10 +1,10 @@
 import React from 'react';
-import { ScoreHistoryPoint } from '../../utils/coach/scoring';
+import { SCORE_COLORS, ScoreHistoryPoint } from '../../utils/coach/scoring';
 
 const SERIES = [
-  { key: 'consistency', label: 'Consistency', color: '#00f5ea' },
-  { key: 'progression', label: 'Progression', color: '#a4ff00' },
-  { key: 'strength', label: 'Strength', color: '#ffe620' },
+  { key: 'consistency', label: 'Consistency', color: SCORE_COLORS.consistency },
+  { key: 'progression', label: 'Progression', color: SCORE_COLORS.progression },
+  { key: 'strength', label: 'Strength', color: SCORE_COLORS.strength },
 ] as const;
 
 const W = 320;

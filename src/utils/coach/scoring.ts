@@ -13,7 +13,14 @@ import { getProgrammeStatus, latestBodyweightKg } from './programme';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WINDOW_DAYS = 28;
 
-export type ScoreKey = 'consistency' | 'progression' | 'volume' | 'strength';
+export type ScoreKey = 'consistency' | 'progression' | 'strength';
+
+/** One colour per score part, shared by its bar and its trend line. */
+export const SCORE_COLORS: Record<ScoreKey, string> = {
+  consistency: '#00f5ea',
+  progression: '#bf5af2',
+  strength: '#ffe620',
+};
 
 export interface SubScore {
   key: ScoreKey;
@@ -33,21 +40,6 @@ export interface TrainerScore {
   subscores: SubScore[];
 }
 
-/** Muscles checked for weekly volume (small helper muscles are left out). */
-const MAJOR_MUSCLES: MuscleGroup[] = [
-  'chest',
-  'lats',
-  'upper_back',
-  'side_delts',
-  'rear_delts',
-  'biceps',
-  'triceps',
-  'quads',
-  'hamstrings',
-  'glutes',
-  'calves',
-];
-
 /**
  * Intermediate-level estimated 1-rep max as a multiple of bodyweight. Rough
  * benchmarks for a trained adult man; beginner/advanced targets scale these.
@@ -65,15 +57,10 @@ const EXPERIENCE_FACTOR = { beginner: 0.7, intermediate: 1, advanced: 1.3 };
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
-export function weeklySetTarget(phase?: string): [number, number] {
-  // Fewer sets are enough to keep muscle while cutting (Bickel et al., 2011).
-  return phase === 'cut' ? [6, 14] : [10, 20];
-}
-
 /**
- * Overall training score from four parts, each judged over the last 4 weeks:
- * showing up as planned, getting stronger, doing enough sets for every muscle,
- * and strength relative to bodyweight.
+ * Overall training score from three parts, judged over the last 4 weeks:
+ * showing up as planned (30%), getting stronger (40%), and strength relative
+ * to bodyweight (30%).
  */
 export function computeTrainerScore(
   workouts: WorkoutSession[],
@@ -110,7 +97,7 @@ export function computeTrainerScore(
   const consistency: SubScore = {
     key: 'consistency',
     label: 'Consistency',
-    weight: 0.25,
+    weight: 0.3,
     score: clamp((recent.length / planned) * 100),
     detail: `${recent.length} of ${planned} planned sessions in the last ${Math.round(daysTracked / 7)} weeks.`,
   };
@@ -139,49 +126,12 @@ export function computeTrainerScore(
   const progression: SubScore = {
     key: 'progression',
     label: 'Progression',
-    weight: 0.3,
+    weight: 0.4,
     score: compared > 0 ? clamp((points / compared) * 100) : null,
     detail:
       compared > 0
         ? `${improved} of ${compared} lifts beat their previous best in the last 4 weeks${phase === 'cut' ? ' (holding strength also counts during a cut)' : ''}.`
         : 'Needs a few more weeks of history to compare lifts against.',
-  };
-
-  // --- Volume: weekly hard sets per major muscle vs the target range ---
-  const [minSets, maxSets] = weeklySetTarget(phase);
-  const muscleSets: Partial<Record<MuscleGroup, number>> = {};
-  for (const w of recent) {
-    for (const b of w.exercises) {
-      const meta = exMap.get(b.exerciseId);
-      if (!meta) continue;
-      const n = getWorkingSets(b.sets).length;
-      muscleSets[meta.primaryMuscle] = (muscleSets[meta.primaryMuscle] || 0) + n;
-      for (const sec of meta.secondaryMuscles) muscleSets[sec] = (muscleSets[sec] || 0) + n * 0.5;
-    }
-  }
-  const weeks = daysTracked / 7;
-  let volumeTotal = 0;
-  const low: string[] = [];
-  for (const m of MAJOR_MUSCLES) {
-    const perWeekSets = (muscleSets[m] || 0) / weeks;
-    if (perWeekSets < minSets) {
-      volumeTotal += perWeekSets / minSets;
-      low.push(MUSCLE_LABELS[m].replace(' & Traps', '').replace(' & Core', ''));
-    } else if (perWeekSets > maxSets * 1.25) {
-      volumeTotal += Math.max(0, 1 - (perWeekSets - maxSets * 1.25) / maxSets);
-    } else {
-      volumeTotal += 1;
-    }
-  }
-  const volume: SubScore = {
-    key: 'volume',
-    label: 'Volume',
-    weight: 0.2,
-    score: clamp((volumeTotal / MAJOR_MUSCLES.length) * 100),
-    detail:
-      low.length === 0
-        ? `Every major muscle gets at least ${minSets} sets a week.`
-        : `Below ${minSets} sets a week: ${low.slice(0, 4).join(', ')}${low.length > 4 ? ` +${low.length - 4} more` : ''}.`,
   };
 
   // --- Strength: best recent lifts vs bodyweight standards ---
@@ -199,7 +149,7 @@ export function computeTrainerScore(
   const strength: SubScore = {
     key: 'strength',
     label: 'Strength',
-    weight: 0.25,
+    weight: 0.3,
     score: ratios.length ? clamp((ratios.reduce((a, b) => a + b, 0) / ratios.length) * 100) : null,
     detail: ratios.length
       ? bodyweight
@@ -208,7 +158,7 @@ export function computeTrainerScore(
       : 'Log bench, squat, deadlift, overhead press or rows to get a strength score.',
   };
 
-  const subscores = [consistency, progression, volume, strength];
+  const subscores = [consistency, progression, strength];
   const scored = subscores.filter((s) => s.score !== null);
   const weightSum = scored.reduce((a, s) => a + s.weight, 0);
   const overall = scored.length

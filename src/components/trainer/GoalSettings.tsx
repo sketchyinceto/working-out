@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { ExperienceLevel, GoalType, Routine, TrainingProfile } from '../../types/workout';
-import { GOAL_LABELS } from '../../data/programmes';
+import { GOAL_LABELS, programmeForGoal } from '../../data/programmes';
+import { splitForDays } from '../../data/programmeSplits';
+import { EXPERIENCE_VOLUME } from '../../utils/coach/programmeWorkouts';
 import { WEEKDAY_SHORT, splitHint } from '../../utils/coach/schedule';
 
 interface GoalSettingsProps {
   profile: TrainingProfile;
   routines: Routine[];
+  /** While following a programme it picks the workouts, so no rotation. */
+  followingProgramme: boolean;
   onSave: (profile: TrainingProfile) => void;
   onClose: () => void;
 }
@@ -17,7 +21,7 @@ const EXPERIENCE: { value: ExperienceLevel; label: string; hint: string }[] = [
   { value: 'advanced', label: 'Advanced', hint: '3+ years' },
 ];
 
-export const GoalSettings: React.FC<GoalSettingsProps> = ({ profile, routines, onSave, onClose }) => {
+export const GoalSettings: React.FC<GoalSettingsProps> = ({ profile, routines, followingProgramme, onSave, onClose }) => {
   const [goal, setGoal] = useState<GoalType>(profile.goal);
   const [experience, setExperience] = useState<ExperienceLevel>(profile.experience);
   const [days, setDays] = useState<number[]>(profile.trainingDays);
@@ -41,7 +45,7 @@ export const GoalSettings: React.FC<GoalSettingsProps> = ({ profile, routines, o
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (days.length === 0 || rotation.length === 0) return;
+          if (days.length === 0 || (!followingProgramme && rotation.length === 0)) return;
           onSave({ goal, experience, trainingDays: days, rotationRoutineIds: rotation });
         }}
         className="w-full max-w-lg bg-[#1c1c1e] border-t sm:border border-white/10 rounded-t-[26px] safe-sheet sm:rounded-[26px] p-4 sm:p-5 space-y-4 max-h-[90vh] overflow-y-auto"
@@ -62,6 +66,9 @@ export const GoalSettings: React.FC<GoalSettingsProps> = ({ profile, routines, o
               </button>
             ))}
           </div>
+          <p className="text-[11px] text-[#8e8e93] mt-1.5">
+            Programme: <span className="text-white">{programmeForGoal(goal).name}</span>
+          </p>
         </div>
 
         <div>
@@ -80,6 +87,9 @@ export const GoalSettings: React.FC<GoalSettingsProps> = ({ profile, routines, o
               </button>
             ))}
           </div>
+          <p className="text-[11px] text-[#8e8e93] mt-1.5">
+            Programme sets per exercise: {Math.round(EXPERIENCE_VOLUME[experience] * 100)}% of standard
+          </p>
         </div>
 
         <div>
@@ -91,9 +101,19 @@ export const GoalSettings: React.FC<GoalSettingsProps> = ({ profile, routines, o
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-[#8e8e93] mt-1.5">{splitHint(days.length)}</p>
+          <p className="text-[11px] text-[#8e8e93] mt-1.5">
+            {days.length > 0 ? (
+              <>
+                Programme layout: <span className="text-white">{splitForDays(days.length).name}</span>
+                {days.length < 3 ? ' (rotating over your days)' : ''}
+              </>
+            ) : (
+              splitHint(days.length)
+            )}
+          </p>
         </div>
 
+        {!followingProgramme && (
         <div>
           <span className={label}>Routine Rotation</span>
           <p className="text-[11px] text-[#8e8e93] mb-1.5">
@@ -125,9 +145,12 @@ export const GoalSettings: React.FC<GoalSettingsProps> = ({ profile, routines, o
             })}
           </div>
         </div>
+        )}
 
-        {(days.length === 0 || rotation.length === 0) && (
-          <p className="text-[11px] text-[#fa114f]">Pick at least one training day and one routine.</p>
+        {(days.length === 0 || (!followingProgramme && rotation.length === 0)) && (
+          <p className="text-[11px] text-[#fa114f]">
+            {followingProgramme ? 'Pick at least one training day.' : 'Pick at least one training day and one routine.'}
+          </p>
         )}
 
         <div className="flex justify-end gap-2 pt-1">
@@ -136,7 +159,7 @@ export const GoalSettings: React.FC<GoalSettingsProps> = ({ profile, routines, o
           </button>
           <button
             type="submit"
-            disabled={days.length === 0 || rotation.length === 0}
+            disabled={days.length === 0 || (!followingProgramme && rotation.length === 0)}
             className="px-4 py-2 rounded-full bg-[#a4ff00] disabled:opacity-40 text-black text-xs font-bold"
           >
             Save

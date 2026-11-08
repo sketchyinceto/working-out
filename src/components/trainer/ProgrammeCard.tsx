@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CalendarRange, ChevronDown, ChevronUp, Utensils } from 'lucide-react';
 import { ProgrammePhase } from '../../data/programmes';
+import { WeekPicker } from './WeekPicker';
 import {
   ProgrammeStatus,
   WEEK_KIND_LABEL,
@@ -21,6 +22,7 @@ interface ProgrammeCardProps {
   bodyweightKg: number | null;
   onChoose: () => void;
   onEnd: () => void;
+  onSetWeek: (week: number) => void;
 }
 
 export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
@@ -28,6 +30,7 @@ export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
   bodyweightKg,
   onChoose,
   onEnd,
+  onSetWeek,
 }) => {
   const [showPlan, setShowPlan] = useState(false);
 
@@ -53,7 +56,7 @@ export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
     );
   }
 
-  const { template, week, weekNumber, totalWeeks, finished, notStarted, startMonday } = status;
+  const { template, week, weekNumber, finished, notStarted, startMonday } = status;
 
   if (finished || !week) {
     return (
@@ -97,10 +100,15 @@ export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
     <section className="af-card p-4 space-y-3.5" aria-labelledby="programme-title">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>
-            {notStarted
-              ? `Starts ${startMonday.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} · week 1 preview`
-              : `Week ${weekNumber} of ${totalWeeks} · ${WEEK_KIND_LABEL[week.kind]}`}
+          <div className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 flex-wrap" style={{ color }}>
+            {notStarted ? (
+              `Starts ${startMonday.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} · week 1 preview`
+            ) : (
+              <>
+                <WeekPicker template={template} weekNumber={weekNumber} color={color} onSetWeek={onSetWeek} />
+                <span>· {WEEK_KIND_LABEL[week.kind]}</span>
+              </>
+            )}
           </div>
           <h2 id="programme-title" className="text-base font-bold text-white leading-tight mt-0.5">
             {week.block}

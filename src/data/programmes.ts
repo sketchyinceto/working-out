@@ -287,6 +287,11 @@ export function getProgramme(id: string): ProgrammeTemplate | undefined {
   return PROGRAMMES.find((p) => p.id === id);
 }
 
+/** The programme designed for a goal (each goal has exactly one). */
+export function programmeForGoal(goal: GoalType): ProgrammeTemplate {
+  return PROGRAMMES.find((p) => p.goals[0] === goal) ?? PROGRAMMES[0];
+}
+
 /** The nutrition guide for a week (deloads in a cut are diet breaks). */
 export function nutritionFor(week: ProgrammeWeek): NutritionGuide {
   if (week.phase === 'cut' && week.kind === 'deload') return NUTRITION.diet_break;

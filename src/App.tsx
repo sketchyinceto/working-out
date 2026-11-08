@@ -3,11 +3,12 @@ import { Dumbbell, Play, Sparkles } from 'lucide-react';
 import {
   ActiveProgramme,
   Exercise,
+  TrainingProfile,
   RestTimerState,
   Routine,
   WorkoutSession,
 } from './types/workout';
-import { getProgrammeStatus, programmeStartDate, latestBodyweightKg } from './utils/coach/programme';
+import { getProgrammeStatus, latestBodyweightKg, mondayOf, programmeStartDate } from './utils/coach/programme';
 import {
   PROGRAMME_ROUTINE_PREFIX,
   activeSplit,
@@ -17,7 +18,7 @@ import {
 import { analyzeProgrammeSession, SessionAnalysis } from './utils/coach/analysis';
 import { defaultProfile } from './utils/coach/schedule';
 import { splitForDays } from './data/programmeSplits';
-import type { ProgrammeTemplate } from './data/programmes';
+import { GOAL_LABELS, ProgrammeTemplate, programmeForGoal } from './data/programmes';
 import { useCloudSync } from './hooks/useCloudSync';
 import { AnalyticsDashboard } from './components/analytics/AnalyticsDashboard';
 import { RestTimerHUD } from './components/logger/RestTimerHUD';
@@ -69,6 +70,7 @@ const ProgrammeWorkoutsView = named(
   () => import('./components/routines/ProgrammeWorkoutsView'),
   'ProgrammeWorkoutsView'
 );
+const GoalSettings = named(() => import('./components/trainer/GoalSettings'), 'GoalSettings');
 const ProgrammePicker = named(() => import('./components/trainer/ProgrammePicker'), 'ProgrammePicker');
 const WorkoutCompleteModal = named(
   () => import('./components/logger/WorkoutCompleteModal'),
@@ -113,6 +115,7 @@ export const App: React.FC = () => {
   const [justCompleted, setJustCompleted] = useState<WorkoutSession | null>(null);
   const [justCompletedAnalysis, setJustCompletedAnalysis] = useState<SessionAnalysis | null>(null);
   const [showProgrammePicker, setShowProgrammePicker] = useState(false);
+  const [showGoalSettings, setShowGoalSettings] = useState(false);
   const [restTimer, setRestTimer] = useState<RestTimerState>({
     isActive: false,
     targetEndTimeMs: 0,
@@ -130,7 +133,14 @@ export const App: React.FC = () => {
     if (!programme || !programmeStatus?.week || programmeStatus.notStarted) return;
     const workout = findProgrammeWorkout(activeSplit(programme, profile), workoutId);
     if (!workout) return;
-    const draft = buildProgrammeDraft(workout, programmeStatus, programme, state.exercises, state.workouts);
+    const draft = buildProgrammeDraft(
+      workout,
+      programmeStatus,
+      programme,
+      state.exercises,
+      state.workouts,
+      profile.experience
+    );
     setState((prev) => ({ ...prev, activeWorkout: draft }));
     setActiveTab('logger');
   };
@@ -191,18 +201,47 @@ export const App: React.FC = () => {
   const updateProgramme = (update: (p: ActiveProgramme) => ActiveProgramme) =>
     setState((prev) => (prev.programme ? { ...prev, programme: update(prev.programme) } : prev));
 
-  const handleStartProgramme = (template: ProgrammeTemplate) => {
+  const newProgramme = (template: ProgrammeTemplate, days: number): ActiveProgramme => {
     const bodyweight = latestBodyweightKg(state.measurements);
+    return {
+      templateId: template.id,
+      startDate: programmeStartDate(),
+      splitId: splitForDays(days).id,
+      ...(bodyweight ? { startBodyweightKg: bodyweight } : {}),
+    };
+  };
+
+  /** Picking a programme also sets the goal it's designed for. */
+  const handleStartProgramme = (template: ProgrammeTemplate) => {
     setState((prev) => ({
       ...prev,
-      programme: {
-        templateId: template.id,
-        startDate: programmeStartDate(),
-        splitId: splitForDays(profile.trainingDays.length).id,
-        ...(bodyweight ? { startBodyweightKg: bodyweight } : {}),
-      },
+      trainingProfile: { ...profile, goal: template.goals[0] },
+      programme: newProgramme(template, profile.trainingDays.length),
     }));
     setShowProgrammePicker(false);
+  };
+
+  /** Goal & Schedule design the programme: a new goal means its programme. */
+  const handleSaveProfile = (next: TrainingProfile) => {
+    const current = state.programme && !programmeStatus?.finished ? state.programme : null;
+    const designed = programmeForGoal(next.goal);
+    if (current && designed.id !== current.templateId) {
+      const ok = window.confirm(
+        `Your goal is now "${GOAL_LABELS[next.goal]}", so your programme becomes "${designed.name}", starting at week 1. Continue?`
+      );
+      if (!ok) return;
+      setState((prev) => ({ ...prev, trainingProfile: next, programme: newProgramme(designed, next.trainingDays.length) }));
+    } else {
+      setState((prev) => ({ ...prev, trainingProfile: next }));
+    }
+    setShowGoalSettings(false);
+  };
+
+  /** Jump to a week: moves the start date so that this week is week `n`. */
+  const handleSetWeek = (n: number) => {
+    const start = mondayOf(new Date());
+    start.setDate(start.getDate() - (n - 1) * 7);
+    updateProgramme((p) => ({ ...p, startDate: toLocalDateStr(start) }));
   };
 
   const handleAcceptSwap = (slotId: string, exerciseId: string) =>
@@ -424,9 +463,10 @@ export const App: React.FC = () => {
               unit={state.unit}
               profile={state.trainingProfile}
               programme={state.programme}
-              onSaveProfile={(trainingProfile) => setState((prev) => ({ ...prev, trainingProfile }))}
               onSetProgramme={(programme) => setState((prev) => ({ ...prev, programme }))}
               onChooseProgramme={() => setShowProgrammePicker(true)}
+              onEditSettings={() => setShowGoalSettings(true)}
+              onSetWeek={handleSetWeek}
               onStartRoutine={startDraft}
               onSwapExercise={handleSwapExerciseInRoutines}
               onOpenExerciseDetail={setSelectedExerciseId}
@@ -456,7 +496,9 @@ export const App: React.FC = () => {
                   workouts={state.workouts}
                   unit={state.unit}
                   onChooseProgramme={() => setShowProgrammePicker(true)}
-                  onSetSplit={(splitId) => updateProgramme((p) => ({ ...p, splitId }))}
+                  onStartProgramme={handleStartProgramme}
+                  onEditSettings={() => setShowGoalSettings(true)}
+                  onSetWeek={handleSetWeek}
                   onStartWorkout={startProgrammeWorkout}
                   onAcceptSwap={handleAcceptSwap}
                   onDismissSwap={handleDismissSwap}
@@ -559,6 +601,16 @@ export const App: React.FC = () => {
             onSave={handleSaveExercise}
             onDelete={handleDeleteExercise}
             onClose={() => setExerciseForm(null)}
+          />
+        )}
+
+        {showGoalSettings && (
+          <GoalSettings
+            profile={profile}
+            routines={state.routines}
+            followingProgramme={!!state.programme && !programmeStatus?.finished}
+            onSave={handleSaveProfile}
+            onClose={() => setShowGoalSettings(false)}
           />
         )}
 

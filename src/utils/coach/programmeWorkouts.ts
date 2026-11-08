@@ -2,6 +2,7 @@ import {
   ActiveProgramme,
   ActiveWorkoutDraft,
   Exercise,
+  ExperienceLevel,
   Routine,
   TrainingProfile,
   WorkoutExercise,
@@ -12,7 +13,6 @@ import {
   ProgrammeSlot,
   ProgrammeSplit,
   ProgrammeWorkout,
-  getSplit,
   splitForDays,
 } from '../../data/programmeSplits';
 import { getLastPerformedExerciseBlock } from '../analytics';
@@ -29,10 +29,24 @@ export function weightStep(ex: Exercise): number {
   return ex.equipment === 'dumbbell' || ex.equipment === 'cable' || ex.equipment === 'ez_bar' ? 2 : 2.5;
 }
 
-/** The split being followed: the saved one, or the one matching your days. */
-export function activeSplit(programme: ActiveProgramme, profile: TrainingProfile): ProgrammeSplit {
-  return getSplit(programme.splitId) ?? splitForDays(profile.trainingDays.length);
+/**
+ * The weekly layout comes from your training days in Goal & Schedule:
+ * 3 days → full body, 4 → upper/lower, 5 → upper/lower + PPL, 6 → PPL ×2.
+ * (Fewer than 3 days rotates the 3 full-body workouts.)
+ */
+export function activeSplit(_programme: ActiveProgramme, profile: TrainingProfile): ProgrammeSplit {
+  return splitForDays(profile.trainingDays.length);
 }
+
+/**
+ * Newer lifters grow on less volume and recover from less; experienced
+ * lifters often need more to keep progressing.
+ */
+export const EXPERIENCE_VOLUME: Record<ExperienceLevel, number> = {
+  beginner: 0.75,
+  intermediate: 1,
+  advanced: 1.15,
+};
 
 export function slotExerciseId(programme: ActiveProgramme, slot: ProgrammeSlot): string {
   return programme.exerciseOverrides?.[slot.id] ?? slot.exerciseId;
@@ -61,8 +75,10 @@ export function planProgrammeWorkout(
   programme: ActiveProgramme,
   week: ProgrammeWeek,
   exercises: Exercise[],
-  history: WorkoutSession[]
+  history: WorkoutSession[],
+  experience: ExperienceLevel = 'intermediate'
 ): PlannedSlot[] {
+  const volume = EXPERIENCE_VOLUME[experience] ?? 1;
   const exMap = new Map(exercises.map((e) => [e.id, e]));
   const planned: PlannedSlot[] = [];
 
@@ -73,7 +89,8 @@ export function planProgrammeWorkout(
     const target = programme.targets?.[slot.id];
     const targetValid = !!target && target.exerciseId === exercise.id;
 
-    const baseSets = Math.max(1, slot.sets + (targetValid ? target!.setDelta : 0));
+    const slotSets = Math.max(1, Math.round(slot.sets * volume));
+    const baseSets = Math.max(1, slotSets + (targetValid ? target!.setDelta : 0));
     const sets = Math.max(1, Math.round(baseSets * week.setsMultiplier));
 
     let weightKg: number;
@@ -121,11 +138,12 @@ export function buildProgrammeDraft(
   status: ProgrammeStatus,
   programme: ActiveProgramme,
   exercises: Exercise[],
-  history: WorkoutSession[]
+  history: WorkoutSession[],
+  experience: ExperienceLevel = 'intermediate'
 ): ActiveWorkoutDraft {
   const week = status.week!;
   const now = Date.now();
-  const plan = planProgrammeWorkout(workout, programme, week, exercises, history);
+  const plan = planProgrammeWorkout(workout, programme, week, exercises, history, experience);
 
   const blocks: WorkoutExercise[] = plan.map((p, idx) => ({
     id: `we-${now}-${idx}`,

@@ -103,12 +103,16 @@ export const ProgressReview: React.FC<ProgressReviewProps> = ({
               {s.text}
               {'suffix' in s && <span className="text-[9px] font-semibold text-[#8e8e93] ml-0.5">{s.suffix}</span>}
             </div>
-            <Delta now={s.now} before={s.before} format={s.format} />
+            {!review.inProgress && <Delta now={s.now} before={s.before} format={s.format} />}
           </div>
         ))}
       </div>
       {review.previous && (
-        <p className="text-[10px] text-[#636366] -mt-1.5">Arrows compare with the previous 4 weeks.</p>
+        <p className="text-[10px] text-[#636366] -mt-1.5">
+          {review.inProgress
+            ? 'Block in progress: the comparison with the previous 4 weeks appears when it ends.'
+            : 'Arrows compare with the previous 4 weeks.'}
+        </p>
       )}
 
       {review.highlights.length > 0 && (
