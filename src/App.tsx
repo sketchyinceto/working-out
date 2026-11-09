@@ -8,7 +8,13 @@ import {
   Routine,
   WorkoutSession,
 } from './types/workout';
-import { getProgrammeStatus, latestBodyweightKg, mondayOf, programmeStartDate } from './utils/coach/programme';
+import {
+  applyMissedWeekRepeats,
+  getProgrammeStatus,
+  latestBodyweightKg,
+  mondayOf,
+  programmeStartDate,
+} from './utils/coach/programme';
 import {
   PROGRAMME_ROUTINE_PREFIX,
   activeSplit,
@@ -125,6 +131,16 @@ export const App: React.FC = () => {
 
   const profile = state.trainingProfile ?? defaultProfile(state.routines);
   const programmeStatus = getProgrammeStatus(state.programme);
+
+  // Each new week, repeat any programme week where under half the planned
+  // sessions were done. Waits for the cloud copy so sessions logged on
+  // another device are counted.
+  const plannedPerWeek = profile.trainingDays.length;
+  useEffect(() => {
+    if (!state.programme || (userName && syncStatus !== 'synced')) return;
+    const updated = applyMissedWeekRepeats(state.programme, state.workouts, plannedPerWeek);
+    if (updated) setState((prev) => (prev.programme ? { ...prev, programme: updated } : prev));
+  }, [state.programme, state.workouts, plannedPerWeek, userName, syncStatus, setState]);
 
   const startProgrammeWorkout = (workoutId: string) => {
     const programme = state.programme;
@@ -251,7 +267,12 @@ export const App: React.FC = () => {
   const handleSetWeek = (n: number) => {
     const start = mondayOf(new Date());
     start.setDate(start.getDate() - (n - 1) * 7);
-    updateProgramme((p) => ({ ...p, startDate: toLocalDateStr(start) }));
+    // Picking a week by hand wins over the automatic missed-week repeat.
+    updateProgramme((p) => ({
+      ...p,
+      startDate: toLocalDateStr(start),
+      checkedThrough: toLocalDateStr(mondayOf(new Date())),
+    }));
   };
 
   const handleAcceptSwap = (slotId: string, exerciseId: string) =>

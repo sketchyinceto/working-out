@@ -173,6 +173,16 @@ export interface ActiveProgramme {
   exerciseOverrides?: Record<string, string>;
   /** Slot id → next-session target. */
   targets?: Record<string, ProgrammeTarget>;
+  /** Monday (YYYY-MM-DD) of the latest week already checked for missed sessions. */
+  checkedThrough?: string;
+  /** The most recent automatic week repeat, for the notice. */
+  lastRepeat?: {
+    /** Monday the repeat took effect. */
+    on: string;
+    week: number;
+    done: number;
+    planned: number;
+  };
 }
 
 /** Programme guidance attached to a workout started during a programme. */

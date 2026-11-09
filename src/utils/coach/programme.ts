@@ -167,3 +167,69 @@ export function nutritionTargets(
     ],
   };
 }
+
+/**
+ * Repeats programme weeks that were mostly missed. For every finished week
+ * not yet checked, if fewer than half the planned programme sessions were
+ * done, the start date moves a week later, so the same week comes round
+ * again. Deload, transition and test weeks are never repeated (missing a
+ * light week costs nothing). Returns the updated programme, or null if
+ * nothing changed.
+ */
+export function applyMissedWeekRepeats(
+  programme: ActiveProgramme,
+  workouts: { startTime: string; programmeWorkoutId?: string }[],
+  plannedPerWeek: number,
+  now: Date = new Date()
+): ActiveProgramme | null {
+  const thisMonday = mondayOf(now);
+  const thisMondayStr = toLocalDateStr(thisMonday);
+  if (programme.checkedThrough === thisMondayStr || plannedPerWeek <= 0) return null;
+
+  let next: ActiveProgramme = { ...programme };
+  const startMonday = mondayOf(parseLocalDate(programme.startDate));
+  // First week not yet checked.
+  let weekStart = programme.checkedThrough
+    ? mondayOf(parseLocalDate(programme.checkedThrough))
+    : startMonday;
+  if (weekStart < startMonday) weekStart = startMonday;
+
+  const needed = Math.ceil(plannedPerWeek / 2);
+  // Before any programme workout has been logged (e.g. history from before
+  // programme workouts existed), count every session so nothing is unfairly
+  // repeated.
+  const countsAll = !workouts.some((w) => w.programmeWorkoutId);
+  // Guard against a corrupted date producing a huge loop.
+  for (let i = 0; i < 60 && weekStart < thisMonday; i++) {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const status = getProgrammeStatus(next, weekStart);
+    const week = status && !status.finished && !status.notStarted ? status.week : null;
+    if (week && week.kind === 'build') {
+      const done = workouts.filter((w) => {
+        const t = Date.parse(w.startTime);
+        return (countsAll || !!w.programmeWorkoutId) && t >= weekStart.getTime() && t < weekEnd.getTime();
+      }).length;
+      if (done < needed) {
+        const start = mondayOf(parseLocalDate(next.startDate));
+        start.setDate(start.getDate() + 7);
+        next = {
+          ...next,
+          startDate: toLocalDateStr(start),
+          lastRepeat: { on: thisMondayStr, week: week.week, done, planned: plannedPerWeek },
+        };
+      }
+    }
+    weekStart = new Date(weekStart);
+    weekStart.setDate(weekStart.getDate() + 7);
+  }
+  next.checkedThrough = thisMondayStr;
+  return next;
+}
+
+/** "Week 3 is repeating…" for the week a repeat took effect, else null. */
+export function repeatNotice(programme: ActiveProgramme | null | undefined, now: Date = new Date()): string | null {
+  const r = programme?.lastRepeat;
+  if (!r || r.on !== toLocalDateStr(mondayOf(now))) return null;
+  return `Week ${r.week} is repeating: only ${r.done} of ${r.planned} planned sessions were done last week. Use the week picker to move on instead.`;
+}

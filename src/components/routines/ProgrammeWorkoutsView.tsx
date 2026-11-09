@@ -7,7 +7,7 @@ import {
   WeightUnit,
   WorkoutSession,
 } from '../../types/workout';
-import { ProgrammeStatus, WEEK_KIND_LABEL, describeRir } from '../../utils/coach/programme';
+import { ProgrammeStatus, WEEK_KIND_LABEL, describeRir, repeatNotice } from '../../utils/coach/programme';
 import {
   activeSplit,
   findProgrammeWorkout,
@@ -89,6 +89,7 @@ export const ProgrammeWorkoutsView: React.FC<ProgrammeWorkoutsViewProps> = ({
   }
 
   const week = status.week;
+  const notice = repeatNotice(programme);
   // The next session to do: today's, or the first one still planned.
   const nextDate = days.find((d) => d.status === 'today' || d.status === 'upcoming')?.dateStr;
 
@@ -115,6 +116,7 @@ export const ProgrammeWorkoutsView: React.FC<ProgrammeWorkoutsViewProps> = ({
             Edit
           </button>
         </div>
+        {notice && <p className="text-[11px] text-[#ffe620] bg-[#ffe620]/10 rounded-xl px-3 py-2 my-1">{notice}</p>}
         <p className="text-[11px] text-[#d1d1d6]">
           Compounds {week.compoundReps[0]}–{week.compoundReps[1]} · isolation {week.isolationReps[0]}–{week.isolationReps[1]} reps · {describeRir(week.rir)}
         </p>

@@ -11,7 +11,7 @@ import {
 import { computeScoreHistory, computeTrainerScore } from '../../utils/coach/scoring';
 import { findStalls, StallAlert } from '../../utils/coach/stalls';
 import { buildWeekSchedule, defaultProfile } from '../../utils/coach/schedule';
-import { getProgrammeStatus, latestBodyweightKg } from '../../utils/coach/programme';
+import { getProgrammeStatus, latestBodyweightKg, repeatNotice } from '../../utils/coach/programme';
 import { activeSplit, programmeWorkoutsAsRoutines } from '../../utils/coach/programmeWorkouts';
 import { ScoreCard } from './ScoreCard';
 import { ProgressReview } from './ProgressReview';
@@ -106,6 +106,7 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
         onEnd={onRemoveProgramme}
         onSetWeek={onSetWeek}
         weekDays={week}
+        notice={repeatNotice(programme)}
       />
 
 

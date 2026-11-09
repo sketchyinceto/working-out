@@ -27,6 +27,8 @@ interface ProgrammeCardProps {
   onSetWeek: (week: number) => void;
   /** This week's days with planned programme workouts. */
   weekDays: ScheduleDay[];
+  /** Shown when a mostly-missed week was repeated. */
+  notice?: string | null;
 }
 
 export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
@@ -36,6 +38,7 @@ export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
   onEnd,
   onSetWeek,
   weekDays,
+  notice,
 }) => {
   const [showPlan, setShowPlan] = useState(false);
 
@@ -129,6 +132,10 @@ export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
           Edit
         </button>
       </div>
+
+      {notice && (
+        <p className="text-[11px] text-[#ffe620] bg-[#ffe620]/10 rounded-xl px-3 py-2">{notice}</p>
+      )}
 
       <WeekStrip days={weekDays} />
 
