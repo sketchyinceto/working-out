@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "diet-sync": "esbuild scripts/diet-sync.ts --bundle --platform=node --format=esm --packages=external --log-level=warning --outfile=node_modules/.cache/diet-sync.mjs && node node_modules/.cache/diet-sync.mjs"
   },
   "dependencies": {
     "lucide-react": "0.475.0",

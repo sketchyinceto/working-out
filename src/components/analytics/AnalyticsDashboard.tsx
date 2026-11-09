@@ -65,7 +65,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   onOpenExerciseDetail,
   onAddBodyweight,
 }) => {
-  const [spotlightExId, setSpotlightExId] = useState<string>('ex-bench-press');
+  const [spotlightExId, setSpotlightExId] = useState<string | null>(null);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [exerciseSearchQuery, setExerciseSearchQuery] = useState('');
   const [pickerSplitFilter, setPickerSplitFilter] = useState<
@@ -82,8 +82,33 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     [exercises]
   );
 
+  const exerciseSessionCounts = useMemo(() => {
+    const counts = new Map<string, { sessions: number; best1RMKg: number }>();
+    for (const ex of exercises) {
+      const s = getExerciseProgressionSeries(ex.id, workouts, null);
+      if (s.length > 0) {
+        const best1RMKg = Math.max(...s.map((pt) => pt.bestE1RMKg));
+        counts.set(ex.id, { sessions: s.length, best1RMKg });
+      }
+    }
+    return counts;
+  }, [exercises, workouts]);
+
+  // Until a lift is picked, show the one logged in the most sessions.
+  const mostLoggedExId = useMemo(() => {
+    let bestId: string | null = null;
+    let bestSessions = 0;
+    for (const [id, c] of exerciseSessionCounts) {
+      if (c.sessions > bestSessions) {
+        bestId = id;
+        bestSessions = c.sessions;
+      }
+    }
+    return bestId;
+  }, [exerciseSessionCounts]);
+
   const spotlightExercise =
-    exerciseMap.get(spotlightExId) || exercises[0];
+    exerciseMap.get(spotlightExId ?? mostLoggedExId ?? 'ex-bench-press') || exercises[0];
   const spotlightPalette = getMusclePalette(spotlightExercise.primaryMuscle);
 
   const progressionSeries = useMemo(
@@ -101,18 +126,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       ),
     [spotlightExercise, workouts, exercises, unit]
   );
-
-  const exerciseSessionCounts = useMemo(() => {
-    const counts = new Map<string, { sessions: number; best1RMKg: number }>();
-    for (const ex of exercises) {
-      const s = getExerciseProgressionSeries(ex.id, workouts, null);
-      if (s.length > 0) {
-        const best1RMKg = Math.max(...s.map((pt) => pt.bestE1RMKg));
-        counts.set(ex.id, { sessions: s.length, best1RMKg });
-      }
-    }
-    return counts;
-  }, [exercises, workouts]);
 
   const filteredPickerExercises = useMemo(() => {
     const byText = searchExercises(exercises, exerciseSearchQuery);
