@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { CalendarRange, ChevronDown, ChevronUp, Utensils } from 'lucide-react';
 import { ProgrammePhase } from '../../data/programmes';
 import { WeekPicker } from './WeekPicker';
+import { WeekStrip } from './WeekStrip';
+import type { ScheduleDay } from '../../utils/coach/schedule';
 import {
   ProgrammeStatus,
   WEEK_KIND_LABEL,
@@ -23,6 +25,8 @@ interface ProgrammeCardProps {
   onChoose: () => void;
   onEnd: () => void;
   onSetWeek: (week: number) => void;
+  /** This week's days with planned programme workouts. */
+  weekDays: ScheduleDay[];
 }
 
 export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
@@ -31,6 +35,7 @@ export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
   onChoose,
   onEnd,
   onSetWeek,
+  weekDays,
 }) => {
   const [showPlan, setShowPlan] = useState(false);
 
@@ -125,6 +130,8 @@ export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
         </button>
       </div>
 
+      <WeekStrip days={weekDays} />
+
       {/* Whole-programme timeline: one segment per week, coloured by phase */}
       <div>
         <div className="flex gap-[2px] h-2.5" aria-hidden="true">
@@ -165,7 +172,7 @@ export const ProgrammeCard: React.FC<ProgrammeCardProps> = ({
           <span className="text-white font-semibold text-right">
             {week.isolationReps[0]}–{week.isolationReps[1]} reps
           </span>
-          <span className="text-[#8e8e93]">Sets vs your routines</span>
+          <span className="text-[#8e8e93]">Sets vs standard</span>
           <span className="text-white font-semibold text-right">{Math.round(week.setsMultiplier * 100)}%</span>
           <span className="text-[#8e8e93]">Effort</span>
           <span className="text-white font-semibold text-right">{describeRir(week.rir)}</span>

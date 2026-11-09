@@ -8,7 +8,7 @@ import {
   WorkoutSession,
 } from '../../types/workout';
 import { blockBoundaries, buildBlockReview } from '../../utils/coach/review';
-import { formatVolume, kgToDisplay } from '../../utils/calculators';
+import { kgToDisplay } from '../../utils/calculators';
 
 interface ProgressReviewProps {
   workouts: WorkoutSession[];
@@ -18,17 +18,6 @@ interface ProgressReviewProps {
   unit: WeightUnit;
 }
 
-function Delta({ now, before, format }: { now: number; before: number | null; format?: (n: number) => string }) {
-  if (before === null || before === 0) return null;
-  const diff = now - before;
-  if (diff === 0) return <span className="text-[10px] text-[#8e8e93]">same</span>;
-  const shown = format ? format(Math.abs(diff)) : String(Math.abs(diff));
-  return (
-    <span className={`text-[10px] font-semibold ${diff > 0 ? 'text-[#a4ff00]' : 'text-[#fa114f]'}`}>
-      {diff > 0 ? '▲' : '▼'} {shown}
-    </span>
-  );
-}
 
 /** 4-week block review, browsable back through earlier blocks. */
 export const ProgressReview: React.FC<ProgressReviewProps> = ({
@@ -48,20 +37,6 @@ export const ProgressReview: React.FC<ProgressReviewProps> = ({
     [current, bounds, workouts, exercises, measurements, programme]
   );
 
-  const stats = [
-    { label: 'Sessions', now: review.totals.sessions, before: review.previous?.sessions ?? null, text: String(review.totals.sessions) },
-    { label: 'Sets', now: review.totals.sets, before: review.previous?.sets ?? null, text: String(review.totals.sets) },
-    {
-      label: 'Volume',
-      suffix: unit,
-      now: review.totals.volumeKg,
-      before: review.previous?.volumeKg ?? null,
-      // Unit is in the label so the number fits the tile.
-      text: formatVolume(review.totals.volumeKg, unit).replace(` ${unit}`, ''),
-      format: (n: number) => formatVolume(n, unit).replace(` ${unit}`, ''),
-    },
-    { label: 'PR sets', now: review.totals.prs, before: review.previous?.prs ?? null, text: String(review.totals.prs) },
-  ];
 
   return (
     <div className="pt-3 border-t border-white/[0.08] space-y-3">
@@ -94,26 +69,6 @@ export const ProgressReview: React.FC<ProgressReviewProps> = ({
           </button>
         </div>
       </div>
-
-      <div className="grid grid-cols-4 gap-1.5">
-        {stats.map((s) => (
-          <div key={s.label} className="bg-black/40 rounded-xl px-2 py-2">
-            <div className="text-[9px] uppercase tracking-wider text-[#8e8e93] font-semibold">{s.label}</div>
-            <div className="text-sm font-bold font-mono-num text-white truncate">
-              {s.text}
-              {'suffix' in s && <span className="text-[9px] font-semibold text-[#8e8e93] ml-0.5">{s.suffix}</span>}
-            </div>
-            {!review.inProgress && <Delta now={s.now} before={s.before} format={s.format} />}
-          </div>
-        ))}
-      </div>
-      {review.previous && (
-        <p className="text-[10px] text-[#636366] -mt-1.5">
-          {review.inProgress
-            ? 'Block in progress: the comparison with the previous 4 weeks appears when it ends.'
-            : 'Arrows compare with the previous 4 weeks.'}
-        </p>
-      )}
 
       {review.highlights.length > 0 && (
         <ul className="space-y-1">

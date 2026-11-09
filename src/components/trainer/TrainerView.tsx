@@ -16,7 +16,6 @@ import { activeSplit, programmeWorkoutsAsRoutines } from '../../utils/coach/prog
 import { ScoreCard } from './ScoreCard';
 import { ProgressReview } from './ProgressReview';
 import { ProgrammeCard } from './ProgrammeCard';
-import { WeekSchedule } from './WeekSchedule';
 import { StallAlerts } from './StallAlerts';
 
 interface TrainerViewProps {
@@ -106,15 +105,9 @@ export const TrainerView: React.FC<TrainerViewProps> = ({
         onChoose={onOpenBuilder}
         onEnd={onRemoveProgramme}
         onSetWeek={onSetWeek}
+        weekDays={week}
       />
 
-      <WeekSchedule
-        days={week}
-        profile={profile}
-        hasProgramme={!!status && !status.finished}
-        onStartRoutine={onStartRoutine}
-        onOpenBuilder={onOpenBuilder}
-      />
 
       <StallAlerts
         alerts={stalls}
