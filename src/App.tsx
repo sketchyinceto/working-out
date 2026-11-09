@@ -20,6 +20,7 @@ import {
   activeSplit,
   buildProgrammeDraft,
   findProgrammeWorkout,
+  slotExerciseId,
 } from './utils/coach/programmeWorkouts';
 import { analyzeProgrammeSession, SessionAnalysis } from './utils/coach/analysis';
 import { defaultProfile } from './utils/coach/schedule';
@@ -185,10 +186,20 @@ export const App: React.FC = () => {
     let analysis: SessionAnalysis | null = null;
     const programme = state.programme;
     if (session.programmeWorkoutId && programme && programmeStatus?.week) {
-      analysis = analyzeProgrammeSession(session, programme, programmeStatus.week, state.exercises, [
+      // Which exercise each slot is meant to have, so a one-off swap doesn't
+      // overwrite the regular exercise's targets.
+      const expected: Record<string, string> = {};
+      for (const w of activeSplit(programme, profile).workouts) {
+        for (const slot of w.slots) expected[slot.id] = slotExerciseId(programme, slot);
+      }
+      analysis = analyzeProgrammeSession(
         session,
-        ...state.workouts,
-      ]);
+        programme,
+        programmeStatus.week,
+        state.exercises,
+        [session, ...state.workouts],
+        expected
+      );
     }
 
     setState((prev) => ({
@@ -550,6 +561,7 @@ export const App: React.FC = () => {
                 onDiscardWorkout={handleDiscardWorkout}
                 onStartRestTimer={handleStartRestTimer}
                 onOpenExerciseDetail={setSelectedExerciseId}
+                onKeepSwap={state.activeWorkout.programmeWorkoutId ? handleAcceptSwap : undefined}
               />
             ) : (
               <div className="af-card p-6 text-center max-w-sm mx-auto my-8 space-y-3.5">

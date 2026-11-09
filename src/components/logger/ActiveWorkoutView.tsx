@@ -29,6 +29,8 @@ interface ActiveWorkoutViewProps {
   onDiscardWorkout: () => void;
   onStartRestTimer: (durationSeconds: number, exerciseName: string) => void;
   onOpenExerciseDetail: (exerciseId: string) => void;
+  /** Programme workouts: make a swap permanent for this programme slot. */
+  onKeepSwap?: (slotId: string, exerciseId: string) => void;
 }
 
 /** Ticking session clock. Its own component so only it re-renders each second. */
@@ -57,6 +59,7 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
   onDiscardWorkout,
   onStartRestTimer,
   onOpenExerciseDetail,
+  onKeepSwap,
 }) => {
   const [inputUnit, setInputUnit] = useState<WeightUnit>(unit);
   const [focusedCell, setFocusedCell] = useState<{
@@ -66,6 +69,8 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
   } | null>(null);
   // null = closed; 'add' = add an exercise; otherwise the block being swapped.
   const [picker, setPicker] = useState<'add' | { swapBlockId: string } | null>(null);
+  // Programme blocks swapped this session, awaiting "keep for future?".
+  const [swapPrompts, setSwapPrompts] = useState<Record<string, string>>({});
 
   const exerciseMap = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises]);
   const toggleInputUnit = () => setInputUnit((u) => (u === 'kg' ? 'lbs' : 'kg'));
@@ -202,6 +207,11 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
         }));
 
     if (picker && picker !== 'add') {
+      const swapped = draft.exercises.find((b) => b.id === picker.swapBlockId);
+      if (swapped?.slotId && onKeepSwap && swapped.exerciseId !== exercise.id) {
+        const fromName = exerciseMap.get(swapped.exerciseId)?.name ?? 'the original exercise';
+        setSwapPrompts((prev) => ({ ...prev, [swapped.id]: prev[swapped.id] ?? fromName }));
+      }
       updateBlock(picker.swapBlockId, (b) => ({
         ...b,
         exerciseId: exercise.id,
@@ -354,6 +364,18 @@ export const ActiveWorkoutView: React.FC<ActiveWorkoutViewProps> = ({
               }
               onFocusField={(setId, field) => setFocusedCell({ blockId: block.id, setId, field })}
               onOpenExerciseDetail={onOpenExerciseDetail}
+              swapPrompt={
+                swapPrompts[block.id] && block.slotId && onKeepSwap
+                  ? {
+                      fromName: swapPrompts[block.id],
+                      onKeep: () => {
+                        onKeepSwap(block.slotId!, block.exerciseId);
+                        setSwapPrompts(({ [block.id]: _done, ...rest }) => rest);
+                      },
+                      onJustToday: () => setSwapPrompts(({ [block.id]: _done, ...rest }) => rest),
+                    }
+                  : undefined
+              }
             />
           );
         })}

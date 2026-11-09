@@ -51,7 +51,9 @@ export function analyzeProgrammeSession(
   week: ProgrammeWeek,
   exercises: Exercise[],
   /** All workouts including this session. */
-  allWorkouts: WorkoutSession[]
+  allWorkouts: WorkoutSession[],
+  /** Slot id → the exercise the programme expects there (skips one-off swaps). */
+  expectedExerciseBySlot?: Record<string, string>
 ): SessionAnalysis {
   const targets: Record<string, ProgrammeTarget> = {};
   const items: ExerciseAnalysis[] = [];
@@ -73,6 +75,9 @@ export function analyzeProgrammeSession(
 
   for (const block of session.exercises) {
     if (!block.slotId) continue;
+    // A one-off swap ("just today"): leave the regular exercise's targets alone.
+    const expectedId = expectedExerciseBySlot?.[block.slotId];
+    if (expectedId && expectedId !== block.exerciseId) continue;
     const exercise = exMap.get(block.exerciseId);
     if (!exercise) continue;
     const sets = getWorkingSets(block.sets);

@@ -3,7 +3,6 @@ import {
   Activity,
   Check,
   ChevronDown,
-  ChevronRight,
   Plus,
   Scale,
   Search,
@@ -504,13 +503,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               </span>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => onOpenExerciseDetail(spotlightExercise.id)}
-            className={`inline-flex items-center gap-0.5 text-xs font-semibold shrink-0 ${spotlightPalette.textClass}`}
-          >
-            Show More <ChevronRight className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
 

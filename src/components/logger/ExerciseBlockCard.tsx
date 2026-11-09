@@ -39,6 +39,8 @@ interface ExerciseBlockCardProps {
   onRemove: () => void;
   onFocusField: (setId: string, field: 'weight' | 'reps') => void;
   onOpenExerciseDetail: (exerciseId: string) => void;
+  /** After swapping a programme exercise: keep it, or just for today? */
+  swapPrompt?: { fromName: string; onKeep: () => void; onJustToday: () => void };
 }
 
 /** One exercise in the live workout: coach hints plus its set rows. */
@@ -61,6 +63,7 @@ export const ExerciseBlockCard: React.FC<ExerciseBlockCardProps> = ({
   onRemove,
   onFocusField,
   onOpenExerciseDetail,
+  swapPrompt,
 }) => {
   const { lastPerf, statDiag } = insight;
   const palette = getMusclePalette(meta.primaryMuscle);
@@ -83,6 +86,23 @@ export const ExerciseBlockCard: React.FC<ExerciseBlockCardProps> = ({
       style={palette.cardGlowStyle}
       className={`af-card border ${palette.cardBorderClass} p-3.5 sm:p-4 space-y-3`}
     >
+      {swapPrompt && (
+        <div className="bg-[#ffe620]/10 rounded-xl px-3 py-2 text-[11px] space-y-1.5">
+          <div className="text-[#d1d1d6]">
+            Swapped from <strong className="text-white">{swapPrompt.fromName}</strong>. Keep{' '}
+            {meta.name} in your programme from now on?
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={swapPrompt.onKeep} className="px-3 py-1 rounded-full bg-[#ffe620] text-black font-bold">
+              Keep
+            </button>
+            <button type="button" onClick={swapPrompt.onJustToday} className="px-3 py-1 rounded-full bg-[#2c2c2e] text-white font-semibold">
+              Just today
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Title + actions */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
