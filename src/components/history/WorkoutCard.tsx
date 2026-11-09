@@ -88,7 +88,6 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({
   }, [session, exerciseMap]);
 
   const palette = getSplitPalette(session.splitTag);
-  const shades = palette.barShades;
 
   const metrics = [
     { label: 'Total Volume', value: formatVolume(totals.volumeKg, unit) },
@@ -111,11 +110,11 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({
               <Dumbbell className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${palette.badgeClass}`}>
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 ${palette.badgeClass}`}>
                   {session.splitTag}
                 </span>
-                <span className="text-[11px] text-[#8e8e93] font-medium">
+                <span className="text-[11px] text-[#8e8e93] font-medium truncate">
                   {formatActivityDateTime(session.startTime)}
                 </span>
               </div>
@@ -123,13 +122,7 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {totals.prCount > 0 && (
-              <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${palette.badgeClass}`}>
-                <Trophy className="w-3.5 h-3.5" /> {totals.prCount}{' '}
-                {totals.prCount === 1 ? 'PR' : 'PRs'}
-              </span>
-            )}
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
             <button
               type="button"
               onClick={onEdit}
@@ -138,6 +131,12 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({
             >
               <Pencil className="w-3.5 h-3.5" />
             </button>
+            {totals.prCount > 0 && (
+              <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${palette.badgeClass}`}>
+                <Trophy className="w-3 h-3" /> {totals.prCount}{' '}
+                {totals.prCount === 1 ? 'PR' : 'PRs'}
+              </span>
+            )}
           </div>
         </div>
 
@@ -163,18 +162,17 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({
         {totals.muscles.length > 0 && (
           <div className="mt-3">
             <div className="w-full h-1.5 rounded-full overflow-hidden flex bg-[#2c2c2e] gap-0.5">
-              {totals.muscles.map((m, i) => (
+              {totals.muscles.map((m) => (
                 <div
                   key={m.muscle}
-                  style={{ width: `${m.pct}%` }}
-                  className={shades[i % shades.length]}
+                  style={{ width: `${m.pct}%`, backgroundColor: getMusclePalette(m.muscle).hex }}
                 />
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[10px] text-[#8e8e93]">
-              {totals.muscles.map((m, i) => (
+              {totals.muscles.map((m) => (
                 <span key={m.muscle} className="inline-flex items-center gap-1">
-                  <span className={`w-1.5 h-1.5 rounded-full ${shades[i % shades.length]}`} />
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getMusclePalette(m.muscle).hex }} />
                   <strong className="text-white">{m.label}</strong> {m.pct}%
                 </span>
               ))}
